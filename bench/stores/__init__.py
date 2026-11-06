@@ -21,6 +21,9 @@ EF_CONSTRUCTION = 100
 EF_SEARCH = 100
 
 
+NAMES = ("pgvector", "qdrant", "milvus", "weaviate", "opensearch")
+
+
 def make(name: str):  # noqa: ANN201
     if name == "pgvector":
         from .pgvector import PgVector
@@ -30,4 +33,16 @@ def make(name: str):  # noqa: ANN201
         from .qdrant import Qdrant
 
         return Qdrant()
+    if name == "milvus":
+        from .milvus import Milvus
+
+        return Milvus()
+    if name == "weaviate":
+        from .weaviate import Weaviate
+
+        return Weaviate()
+    if name == "opensearch":
+        from .opensearch import OpenSearch
+
+        return OpenSearch()
     raise ValueError(f"unknown store {name!r}")

@@ -27,7 +27,8 @@ from .util import log, write_json, write_jsonl_gz
 from .workload import Workload, principals
 
 PACKAGES = [
-    "numpy", "psycopg", "pgvector", "qdrant-client", "authzed", "openfga-sdk", "langchain-core",
+    "numpy", "psycopg", "pgvector", "qdrant-client", "pymilvus", "weaviate-client", "opensearch-py",
+    "authzed", "openfga-sdk", "langchain-core",
     "langchain-spicedb", "auth0-ai-langchain", "auth0-ai", "grpcio", "protobuf", "pydantic",
 ]
 
@@ -156,9 +157,12 @@ def main() -> None:
     meta["pairs"] = len(pairs)
     layout, user, q = pairs[0]
     meta["probes"] = {"fga_ainvoke": asyncio.run(probe_fga_async(ctx, user, f"q{q}"))}
+    log(f"probes: {meta['probes']}")
     rows = asyncio.run(measure(ctx, names, pairs, args.seed, args.warmup))
     if store.name == "pgvector":
         meta["plans"] = explain_samples(ctx, pairs)
+    if hasattr(store, "strategy"):
+        meta["filter_strategy_at_end"] = store.strategy()
     store.close()
     write_jsonl_gz(args.out, rows)
     write_json(args.out.with_name(args.out.name.replace(".jsonl.gz", ".meta.json")), meta)

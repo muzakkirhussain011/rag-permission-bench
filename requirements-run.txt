@@ -3,6 +3,9 @@
 psycopg[binary]==3.3.8
 pgvector==0.5.1
 qdrant-client==1.20.0
+pymilvus==3.0.2
+weaviate-client==4.24.1
+opensearch-py==3.2.0
 authzed==1.25.0
 openfga-sdk==0.9.9
 langchain-core==0.3.86

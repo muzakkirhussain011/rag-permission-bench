@@ -17,6 +17,7 @@ post-filter wraps) and `IdFilteredStore` (a vector store whose `asimilarity_sear
 | a3-spicedb@S | langchain-spicedb `SpiceDBPreFilterRetriever`: LookupResources, then an id filter |
 | a4@S | the store's own filter on the user's principals |
 | a5-rls@S | PostgreSQL row-level security (pgvector only) |
+| a5-dls | OpenSearch document-level security: an unfiltered search sent as the user (OpenSearch only) |
 
 `@S` is the store setting the filtered search runs under (see `bench/stores`).
 """
@@ -118,6 +119,13 @@ def _rls(ctx: Context, setting: str) -> Run:
     return run
 
 
+def _dls(ctx: Context) -> Run:
+    async def run(user: str, groups: list[str], key: str) -> Hits:
+        return ctx.store.search_dls(ctx.vector(key), K, user)
+
+    return run
+
+
 def _fga_post(ctx: Context, multiple: int) -> Run:
     from auth0_ai_langchain import FGARetriever
     from openfga_sdk import ClientConfiguration
@@ -201,6 +209,8 @@ def names(store: Any) -> list[str]:
     arms += [f"a3-spicedb@{s}" for s in store.settings] + [f"a4@{s}" for s in store.settings]
     if store.name == "pgvector":
         arms = ["a0"] + arms + [f"a5-rls@{s}" for s in store.settings]
+    if store.name == "opensearch":
+        arms += ["a5-dls"]
     return arms
 
 
@@ -212,6 +222,8 @@ def build(name: str, ctx: Context) -> Run:
         return _store_filter(ctx, setting)
     if arm == "a5-rls":
         return _rls(ctx, setting)
+    if arm == "a5-dls":
+        return _dls(ctx)
     if arm == "a3-spicedb":
         return _spicedb_pre(ctx, setting)
     if arm in ("a1-fga", "a1-spicedb") or arm.startswith("a2-"):

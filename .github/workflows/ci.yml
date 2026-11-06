@@ -45,15 +45,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        store: [pgvector, qdrant]
+        store: [pgvector, qdrant, milvus, weaviate, opensearch]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-lock.txt
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt
       - name: Start the store and both engines
-        run: docker compose --profile ${{ matrix.store }} --profile authz up -d
+        run: |
+          sudo sysctl -w vm.max_map_count=262144
+          docker compose --profile ${{ matrix.store }} --profile authz up -d
       - run: python -m bench.devdata --out data/dev
       - run: python -m bench.truth --workload data/dev
       - run: python -m bench.run --workload data/dev --store ${{ matrix.store }} --out results/dev-${{ matrix.store }}.jsonl.gz
