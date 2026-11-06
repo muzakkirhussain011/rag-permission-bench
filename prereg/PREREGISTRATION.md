@@ -20,6 +20,9 @@ Changes after deposit go in a dated amendments section at the end, never in plac
   disclosed because it shapes an arm: auth0-ai-langchain 1.0.1's `FGARetriever.ainvoke` raised
   `TypeError: unhashable type: 'Document'` on every store (langchain-core 0.3.86, the newest its package allows).
   Arm A1-FGA therefore uses `invoke`, as Auth0's README does, and the async failure is reported as a finding.
+  Also seen on that synthetic workload, and disclosed because they concern exploratory measures: OpenSearch
+  document-level security (A5) returned fewer than k hits for users who may read few chunks; and in the short
+  change runs, revocations took about 2 s to show on arms that ask SpiceDB, and under 0.2 s on the others.
 
 ## 2. Questions
 
