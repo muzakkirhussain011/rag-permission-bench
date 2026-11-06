@@ -51,7 +51,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-run.txt
+      - run: pip install -r requirements-lock.txt
       - name: Start the store and both engines
         run: docker compose --profile ${{ matrix.store }} --profile authz up -d
       - run: python -m bench.devdata --out data/dev
@@ -59,7 +59,7 @@ jobs:
       - run: python -m bench.run --workload data/dev --store ${{ matrix.store }} --out results/dev-${{ matrix.store }}.jsonl.gz
       - run: python -m bench.analyze --workload data/dev --run results/dev-${{ matrix.store }}.jsonl.gz --check
       - if: always()
-        run: docker compose --profile ${{ matrix.store }} --profile authz logs --no-color > results/compose.log 2>&1 || true
+        run: mkdir -p results && docker compose --profile ${{ matrix.store }} --profile authz logs --no-color > results/compose.log 2>&1 || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:

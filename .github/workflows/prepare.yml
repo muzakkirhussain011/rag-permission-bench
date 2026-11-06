@@ -1,0 +1,59 @@
+name: prepare
+
+# Builds the MS MARCO corpus (embedded on this runner's CPU), the W3 sweep and its exact answers.
+# With `publish`, the files go to a GitHub release; otherwise they are kept as a workflow artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: passages to take from the start of BEIR MS MARCO
+        default: "1000000"
+      publish:
+        description: publish as a release
+        type: boolean
+        default: false
+      release:
+        description: release tag when publishing
+        default: data-msmarco-v1
+
+permissions:
+  contents: write
+
+jobs:
+  msmarco:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h / && nproc && free -g
+      - run: pip install -r requirements-data.txt && pip freeze --all
+      - run: python -m bench.data_msmarco --out data/msmarco --n ${{ inputs.n }}
+      - run: python -m bench.w3 --corpus data/msmarco --out data/w3
+      - run: python -m bench.truth --workload data/w3
+      - name: Package
+        run: |
+          cd data
+          tar czf w3-workload.tar.gz -C w3 acl.npz names.json layouts.json meta.json truth.jsonl.gz folders.npy corpus-meta.json
+          mkdir -p out && cp msmarco/vectors.npy msmarco/queries.npy msmarco/passages.json.gz msmarco/questions.json out/
+          cp msmarco/meta.json out/corpus-meta.json && cp w3-workload.tar.gz out/
+          cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS && ls -la
+      - if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: msmarco-${{ inputs.n }}
+          path: data/out/
+          retention-days: 14
+      - if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release }}" data/out/* \
+            --title "Data: MS MARCO (${{ inputs.n }} passages) and the W3 sweep" \
+            --notes "Built by run ${{ github.run_id }} at commit ${{ github.sha }} with bench.data_msmarco, bench.w3 and bench.truth. Checksums in SHA256SUMS; sources and model in corpus-meta.json."

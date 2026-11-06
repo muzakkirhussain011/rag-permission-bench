@@ -88,14 +88,16 @@ def _relationship(t: Tuple):  # noqa: ANN202
 
 
 def load_spicedb(w: Workload) -> dict:
-    from authzed.api.v1 import ImportBulkRelationshipsRequest, WriteSchemaRequest
+    import authzed.api.v1 as v1
 
     client = spicedb_client()
     schema = (CONFIG / "spicedb.zed").read_text(encoding="utf-8")
-    retry(lambda: client.WriteSchema(WriteSchemaRequest(schema=schema)), "SpiceDB")
+    retry(lambda: client.WriteSchema(v1.WriteSchemaRequest(schema=schema)), "SpiceDB")
+    # authzed 1.25 names the bulk import BulkImportRelationships; newer clients ImportBulkRelationships.
+    request = getattr(v1, "ImportBulkRelationshipsRequest", None) or v1.BulkImportRelationshipsRequest
+    method = getattr(client, "ImportBulkRelationships", None) or client.BulkImportRelationships
     started = time.perf_counter()
-    requests = (ImportBulkRelationshipsRequest(relationships=[_relationship(t) for t in b]) for b in batches(tuples(w)))
-    response = client.ImportBulkRelationships(requests)
+    response = method(request(relationships=[_relationship(t) for t in b]) for b in batches(tuples(w)))
     seconds = time.perf_counter() - started
     log(f"SpiceDB: {response.num_loaded} relationships in {seconds:.0f} s")
     return {"relationships": int(response.num_loaded), "load_s": seconds}
