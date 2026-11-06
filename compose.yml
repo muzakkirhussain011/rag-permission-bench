@@ -122,8 +122,6 @@ services:
       OPENFGA_DATASTORE_ENGINE: postgres
       OPENFGA_DATASTORE_URI: "postgres://postgres:authz@authzdb:5432/openfga?sslmode=disable"
       OPENFGA_PLAYGROUND_ENABLED: "false"
-      # Loading only: larger write batches. Query-time limits stay at their defaults.
-      OPENFGA_MAX_TUPLES_PER_WRITE: "1000"
     ports: ["8080:8080"]
     depends_on:
       openfga-migrate: {condition: service_completed_successfully}

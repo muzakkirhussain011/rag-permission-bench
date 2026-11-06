@@ -40,7 +40,7 @@ Changes after deposit go in a dated amendments section at the end, never in plac
 | A2 | Post-filter, over-fetch | A1 with 3k and with 10k candidates, then the first k readable |
 | A3 | Engine pre-filter | langchain-spicedb 0.2.0 `SpiceDBPreFilterRetriever`, under each store setting |
 | A4 | Reader groups on chunks | each store's filtered search at its default and at its documented alternative setting |
-| A5 | Database-native | PostgreSQL row-level security with pgvector; OpenSearch document-level security |
+| A5 | Database-native | PostgreSQL row-level security with pgvector; OpenSearch document-level security (one role per principal, each user mapped to the roles of their principals) |
 | A6 | Partitioning | one pgvector table and HNSW index per role (W2) or per user (W1), searched and merged; HoneyBee if its authors license the code |
 | A7 | wardowl | one commit, pinned before deposit, on pgvector and Qdrant |
 

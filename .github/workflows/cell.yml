@@ -70,7 +70,9 @@ jobs:
           meta = json.loads((root / "meta.json").read_text())
           vectors = np.load(root / "vectors.npy", mmap_mode="r")
           if len(vectors) > meta["n_chunks"]:  # W2 uses the first n passages of the corpus
-              np.save(root / "vectors.npy", np.ascontiguousarray(vectors[: meta["n_chunks"]]))
+              head = np.array(vectors[: meta["n_chunks"]])  # copy before the file is rewritten
+              del vectors
+              np.save(root / "vectors.npy", head)
           bad = [f for f, digest in meta["sha256"].items() if sha256(root / f) != digest]
           assert not bad, f"checksum mismatch: {bad}"
           print("workload", meta["name"], meta["n_chunks"], "chunks: checksums match")

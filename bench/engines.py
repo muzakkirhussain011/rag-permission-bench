@@ -30,6 +30,7 @@ SPICEDB_TOKEN = "bench"
 SPICEDB_ADMIN = "localhost:50051"
 OPENFGA_ADMIN = "http://localhost:8080"
 BATCH = 1000
+FGA_BATCH = 100  # OpenFGA's default maximum tuples per write
 
 
 @dataclass(frozen=True)
@@ -102,10 +103,18 @@ def load_spicedb(w: Workload) -> dict:
     request = getattr(v1, "ImportBulkRelationshipsRequest", None) or v1.BulkImportRelationshipsRequest
     method = getattr(client, "ImportBulkRelationships", None) or client.BulkImportRelationships
     started = time.perf_counter()
-    response = method(request(relationships=[_relationship(t) for t in b]) for b in batches(tuples(w)))
+    # SpiceDB ends any call after 30 s, so the relationships go in several imports of at most 100,000.
+    loaded, call = 0, []
+    for batch in batches(tuples(w)):
+        call.append(request(relationships=[_relationship(t) for t in batch]))
+        if len(call) * BATCH >= 100_000:
+            loaded += int(method(iter(call)).num_loaded)
+            call = []
+    if call:
+        loaded += int(method(iter(call)).num_loaded)
     seconds = time.perf_counter() - started
-    log(f"SpiceDB: {response.num_loaded} relationships in {seconds:.0f} s")
-    return {"relationships": int(response.num_loaded), "load_s": seconds}
+    log(f"SpiceDB: {loaded} relationships in {seconds:.0f} s")
+    return {"relationships": loaded, "load_s": seconds}
 
 
 # ---- OpenFGA ------------------------------------------------------------------------------------
@@ -136,12 +145,23 @@ def load_openfga(w: Workload) -> dict:
     started = time.perf_counter()
 
     def write(batch: list[Tuple]) -> int:
+        # OpenFGA's default write limit (100 tuples) and request deadline stay as they are; a write that
+        # meets the deadline under load is retried, which is safe because each batch is new tuples only.
         body = {"writes": {"tuple_keys": [_fga_key(t) for t in batch]}, "authorization_model_id": model_id}
-        _fga("POST", f"/stores/{store_id}/write", body)
-        return len(batch)
+        for attempt in range(6):
+            try:
+                _fga("POST", f"/stores/{store_id}/write", body)
+                return len(batch)
+            except RuntimeError as error:
+                text = str(error)
+                server_side = "deadline" in text or any(f": {code} " in text for code in (500, 502, 503, 504))
+                if not server_side or attempt == 5:
+                    raise
+                time.sleep(2 ** attempt)
+        return 0
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        total = sum(pool.map(write, batches(tuples(w))))
+        total = sum(pool.map(write, batches(tuples(w), FGA_BATCH)))
     seconds = time.perf_counter() - started
     log(f"OpenFGA: {total} tuples in {seconds:.0f} s")
     return {"store_id": store_id, "model_id": model_id, "tuples": total, "load_s": seconds}

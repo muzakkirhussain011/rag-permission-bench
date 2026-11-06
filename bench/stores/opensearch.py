@@ -4,8 +4,8 @@ Setting `default`: the filter goes inside the `knn` clause, which OpenSearch doc
 filtering, applied during the search. Long id lists meet OpenSearch's own limits (for example
 `index.max_terms_count`, 65,536 by default); those failures are results, not harness errors.
 
-Document-level security (arm A5) uses the security plugin: one role per user whose DLS query is
-`terms` on the user's principals, one internal user mapped to it, and an unfiltered `knn` search
+Document-level security (arm A5) uses the security plugin: one role per principal whose DLS query
+is `term` on it, each user mapped to the roles of their principals, and an unfiltered `knn` search
 sent as that user. The admin account bypasses DLS and serves every other arm.
 """
 
@@ -81,25 +81,38 @@ class OpenSearch:
         loaded = time.perf_counter()
         users = self._dls_users(client, w)
         segments = client.cat.segments(index=INDEX, format="json")
-        log(f"opensearch: {ok} documents in {loaded - started:.0f} s, {len(segments)} segments, {users} DLS users")
+        log(f"opensearch: {ok} documents in {loaded - started:.0f} s, {len(segments)} segments, {users} DLS users,"
+            f" {self.dls_roles} DLS roles")
         return {"load_s": loaded - started, "documents": ok, "segments": len(segments), "dls_users": users,
-                "dls_s": time.perf_counter() - loaded}
+                "dls_roles": self.dls_roles, "dls_s": time.perf_counter() - loaded}
 
     def _dls_users(self, client, w: Workload) -> int:  # noqa: ANN001
-        count = 0
+        """One role per principal (`term` on it) and each user mapped to the roles of their principals.
+        OpenSearch joins a user's DLS queries with OR. A single role per user listing all their
+        principals does not work at these sizes: the security API refuses role strings over 4,096
+        characters, and a DLS query is a string."""
+        holders: dict[str, list[str]] = {}
+        users: set[str] = set()
         for layout in w.layouts:
-            users = sorted(set(layout.user_groups) | {u for u, _ in layout.queries})
-            for user in users:
-                dls = json.dumps({"terms": {"principals": principals(user, layout.user_groups.get(user, []))}})
-                client.transport.perform_request("PUT", f"/_plugins/_security/api/roles/r_{user}", body={
-                    "index_permissions": [{"index_patterns": [INDEX], "dls": dls, "allowed_actions": ["read"]}],
-                })
-                client.transport.perform_request("PUT", f"/_plugins/_security/api/internalusers/{user}",
-                                                 body={"password": READER_PASSWORD})
-                client.transport.perform_request("PUT", f"/_plugins/_security/api/rolesmapping/r_{user}",
-                                                 body={"users": [user]})
-                count += 1
-        return count
+            for user in sorted(set(layout.user_groups) | {u for u, _ in layout.queries}):
+                users.add(user)
+                for p in principals(user, layout.user_groups.get(user, [])):
+                    holders.setdefault(p, []).append(user)
+        role = {p: "dls_" + p.replace(":", "_") for p in holders}
+
+        def patch(path: str, ops: list[dict]) -> None:
+            for start in range(0, len(ops), 500):
+                client.transport.perform_request("PATCH", f"/_plugins/_security/api/{path}", body=ops[start : start + 500])
+
+        patch("roles", [{"op": "add", "path": f"/{role[p]}", "value": {"index_permissions": [{
+            "index_patterns": [INDEX], "dls": json.dumps({"term": {"principals": p}}), "allowed_actions": ["read"]}]}}
+            for p in holders])
+        patch("internalusers", [{"op": "add", "path": f"/{u}", "value": {"password": READER_PASSWORD}}
+                                for u in sorted(users)])
+        patch("rolesmapping", [{"op": "add", "path": f"/{role[p]}", "value": {"users": sorted(set(holders[p]))}}
+                               for p in holders])
+        self.dls_roles = len(holders)
+        return len(users)
 
     def open(self) -> None:
         self.client = _client()
