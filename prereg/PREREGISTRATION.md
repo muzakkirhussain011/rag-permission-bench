@@ -6,7 +6,10 @@ Changes after deposit go in a dated amendments section at the end, never in plac
 
 ## 1. Status at writing
 
-- No measured run of this study exists. Pilots will only check that the harness runs; their numbers are never reported.
+- No measured run of this study exists. Pilots only check that the harness runs and how long each arm takes:
+  `bench.timing` reports their latencies and errors, recall is never computed for them, and they are never reported.
+  Pilot latencies and errors bear on H4; H1 to H8 were committed publicly (commit c757b4c, 2026-11-06) before any
+  run on real data, and their wording has not changed since.
 - What the author already knows: the source code and documentation of the integrations and stores named in section 3,
   read 2026-11-06 (notes file); results of the author's earlier preprint on wardowl ("Testing Permission-Aware
   Retrieval for RAG across Vector Stores and Authorization Engines", archive 10.5281/zenodo.23874614), which used other

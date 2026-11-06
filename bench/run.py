@@ -141,6 +141,7 @@ def main() -> None:
     p.add_argument("--layouts", default="")
     p.add_argument("--settle", type=float, default=10.0, help="seconds between loading and the first query")
     p.add_argument("--partitions", action="store_true", help="also build per-principal partitions (arm A6, pgvector)")
+    p.add_argument("--pairs-per-layout", type=int, default=0, help="sample this many pairs per layout (0: all)")
     args = p.parse_args()
 
     meta: dict = {"args": {k: str(v) for k, v in vars(args).items()}, "environment": environment()}
@@ -154,7 +155,15 @@ def main() -> None:
     store.open()
     ctx = Context(w, store, fga=meta["load"]["openfga"])
     wanted = set(filter(None, args.layouts.split(",")))
-    pairs = [(layout, u, q) for layout in w.layouts if not wanted or layout.name in wanted for u, q in layout.queries]
+    pairs = []
+    sampler = random.Random(args.seed)
+    for layout in w.layouts:
+        if wanted and layout.name not in wanted:
+            continue
+        chosen = [(layout, u, q) for u, q in layout.queries]
+        if args.pairs_per_layout:
+            chosen = sampler.sample(chosen, min(args.pairs_per_layout, len(chosen)))
+        pairs += chosen
     names = [a for a in args.arms.split(",") if a] or arms.names(store)
     meta["arms"] = names
     meta["pairs"] = len(pairs)

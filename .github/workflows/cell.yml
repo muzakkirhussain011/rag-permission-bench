@@ -21,6 +21,9 @@ on:
         default: ""
       seed:
         default: "1"
+      pairs:
+        description: pairs sampled per layout (0 = all)
+        default: "0"
       label:
         description: pilot or measured
         default: pilot
@@ -88,8 +91,12 @@ jobs:
             python -m bench.churn --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }}
           else
             python -m bench.run --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz \
-              --seed ${{ inputs.seed }} --layouts "${{ inputs.layouts }}" $partitions
-            python -m bench.analyze --workload data/$W --run $OUT.jsonl.gz
+              --seed ${{ inputs.seed }} --layouts "${{ inputs.layouts }}" --pairs-per-layout ${{ inputs.pairs }} $partitions
+            if [ "${{ inputs.label }}" = measured ]; then
+              python -m bench.analyze --workload data/$W --run $OUT.jsonl.gz
+            else
+              python -m bench.timing --run $OUT.jsonl.gz  # pilots: timings and errors only, no recall
+            fi
           fi
       - if: always()
         run: |
