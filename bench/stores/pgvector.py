@@ -7,6 +7,13 @@ filtering; `exact` turns index scans off, which makes every answer exact (the co
 Row-level security (arm A5) uses a second role, `bench_reader`, that is not the table's owner. Its
 policy compares the row's principals with the session setting `bench.principals`, which the
 application sets for each request.
+
+Every query is planned with its own parameters: psycopg's automatic prepared statements are off
+(`prepare_threshold=None`). psycopg prepares a query once it has run five times on a connection, and
+PostgreSQL may then plan a prepared statement once for any parameters (a generic plan). In the first
+full-size pilot, with preparation on, the filtered arm took as long as the exact control at every
+share, while single plans recorded afterwards with their actual parameters used the HNSW index in
+two of the three layouts looked at.
 """
 
 from __future__ import annotations
@@ -35,7 +42,7 @@ def _connect(dsn: str):  # noqa: ANN202
     import psycopg
     from pgvector.psycopg import register_vector
 
-    conn = psycopg.connect(dsn, autocommit=True)
+    conn = psycopg.connect(dsn, autocommit=True, prepare_threshold=None)
     register_vector(conn)
     conn.execute(f"SET hnsw.ef_search = {EF_SEARCH}")
     return conn

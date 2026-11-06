@@ -26,11 +26,11 @@ READER_PASSWORD = "Bench-Reader-2026!"
 INDEX = "chunks"
 
 
-def _client(auth: tuple[str, str] = ADMIN):  # noqa: ANN202
+def _client(auth: tuple[str, str] = ADMIN, timeout: int = 60):  # noqa: ANN202
     from opensearchpy import OpenSearch
 
     return OpenSearch(hosts=[{"host": HOST, "port": PORT}], http_auth=auth, use_ssl=True, verify_certs=False,
-                      ssl_show_warn=False, timeout=60)
+                      ssl_show_warn=False, timeout=timeout)
 
 
 def _body(q: np.ndarray, k: int, where: dict | None) -> dict:
@@ -79,7 +79,7 @@ class OpenSearch:
             raise RuntimeError(f"OpenSearch rejected {len(errors)} documents, first: {errors[0]}")
         client.indices.refresh(index=INDEX)
         loaded = time.perf_counter()
-        users = self._dls_users(client, w)
+        users = self._dls_users(_client(timeout=900), w)
         segments = client.cat.segments(index=INDEX, format="json")
         log(f"opensearch: {ok} documents in {loaded - started:.0f} s, {len(segments)} segments, {users} DLS users,"
             f" {self.dls_roles} DLS roles")
@@ -100,17 +100,19 @@ class OpenSearch:
                     holders.setdefault(p, []).append(user)
         role = {p: "dls_" + p.replace(":", "_") for p in holders}
 
-        def patch(path: str, ops: list[dict]) -> None:
-            for start in range(0, len(ops), 500):
-                client.transport.perform_request("PATCH", f"/_plugins/_security/api/{path}", body=ops[start : start + 500])
+        def patch(path: str, ops: list[dict], size: int) -> None:
+            for start in range(0, len(ops), size):
+                client.transport.perform_request("PATCH", f"/_plugins/_security/api/{path}", body=ops[start : start + size])
 
         patch("roles", [{"op": "add", "path": f"/{role[p]}", "value": {"index_permissions": [{
             "index_patterns": [INDEX], "dls": json.dumps({"term": {"principals": p}}), "allowed_actions": ["read"]}]}}
-            for p in holders])
+            for p in holders], 500)
+        # The security plugin hashes each new user's password; 500 users in one call took over 60 s in a pilot.
         patch("internalusers", [{"op": "add", "path": f"/{u}", "value": {"password": READER_PASSWORD}}
-                                for u in sorted(users)])
+                                for u in sorted(users)], 100)
         patch("rolesmapping", [{"op": "add", "path": f"/{role[p]}", "value": {"users": sorted(set(holders[p]))}}
-                               for p in holders])
+                               for p in holders], 500)
+        client.close()
         self.dls_roles = len(holders)
         return len(users)
 

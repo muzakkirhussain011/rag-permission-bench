@@ -14,7 +14,7 @@ on:
         description: pgvector, qdrant, milvus, weaviate or opensearch
         default: pgvector
       kind:
-        description: run or churn
+        description: run, churn or faults
         default: run
       layouts:
         description: comma-separated layout names (empty = all)
@@ -91,9 +91,16 @@ jobs:
           case "$W" in w1|w2_*) [ "${{ inputs.store }}" = pgvector ] && partitions="--partitions" ;; esac
           if [ "${{ inputs.kind }}" = churn ]; then
             python -m bench.churn --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }}
+          elif [ "${{ inputs.kind }}" = faults ]; then
+            # The arms' engine traffic goes through Toxiproxy; loading and changes still go straight to the engines.
+            BENCH_SPICEDB_GRPC=localhost:60051 BENCH_SPICEDB_HTTP=http://localhost:60443 \
+              BENCH_OPENFGA_URL=http://localhost:60080 \
+              python -m bench.faults --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }}
           else
             python -m bench.run --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz \
               --seed ${{ inputs.seed }} --layouts "${{ inputs.layouts }}" --pairs-per-layout ${{ inputs.pairs }} $partitions
+          fi
+          if [ "${{ inputs.kind }}" != churn ]; then
             if [ "${{ inputs.label }}" = measured ]; then
               python -m bench.analyze --workload data/$W --run $OUT.jsonl.gz
             else

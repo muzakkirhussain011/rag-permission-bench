@@ -1,5 +1,6 @@
-"""Timings and errors of a run, without scoring it. Pilot runs use this instead of `bench.analyze`, so no
-recall on real data is seen before the pre-registration is deposited.
+"""Timings and errors of a run, without scoring it, and on pgvector the shape of each recorded plan. Pilot
+runs use this instead of `bench.analyze`, so no recall on real data is seen before the pre-registration is
+deposited.
 
     python -m bench.timing --run results/pilot-run-w3-pgvector-seed1.jsonl.gz
 """
@@ -7,6 +8,7 @@ recall on real data is seen before the pre-registration is deposited.
 from __future__ import annotations
 
 import argparse
+import json
 from collections import defaultdict
 from pathlib import Path
 
@@ -38,6 +40,21 @@ def main() -> None:
         if cell["first_error"]:
             print(f"ERROR {cell['arm']} {cell['layout']}: {cell['first_error']}")
     write_json(args.run.with_name(args.run.name.replace(".jsonl.gz", ".timing.json")), out)
+    meta = args.run.with_name(args.run.name.replace(".jsonl.gz", ".meta.json"))
+    if meta.exists():
+        plans = json.loads(meta.read_text(encoding="utf-8")).get("plans", [])
+        if plans:
+            print("\n| arm | layout | plan (node types and indexes only) |\n|---|---|---|")
+            for p in plans:
+                print(f"| {p['arm']} | {p['layout']} | {plan_shape(p['plan']['Plan'])} |")
+
+
+def plan_shape(node: dict) -> str:
+    """Which scans a pgvector plan used, without row counts, so a pilot shows how an arm ran but not
+    what it returned."""
+    name = node["Node Type"] + (f"[{node['Index Name']}]" if "Index Name" in node else "")
+    children = [plan_shape(child) for child in node.get("Plans", [])]
+    return name + (" > " + ", ".join(children) if children else "")
 
 
 if __name__ == "__main__":

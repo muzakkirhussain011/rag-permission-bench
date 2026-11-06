@@ -1,10 +1,11 @@
 """Run one cell: load a store and both engines with a workload, then measure every arm.
 
     python -m bench.run --workload data/dev --store pgvector --out results/dev-pgvector.jsonl.gz
-        [--seed 1] [--warmup 20] [--arms a0,a4@default] [--layouts name,...] [--settle 10]
+        [--seed 1] [--warmup 10] [--arms a0,a4@default] [--layouts name,...] [--settle 10]
 
 All arms run in this one process, one query at a time, in an order drawn from `--seed`. Each arm
-gets `--warmup` unrecorded queries first. Every answer is written raw (hit ids, scores, latency,
+gets `--warmup` unrecorded queries first, drawn from its own pairs (A0 and A3 answer a pre-registered
+subset, `arm_pairs`). Every answer is written raw (hit ids, scores, latency,
 error); scoring is a separate step (`bench.analyze`). A `.meta.json` beside the output records
 versions, images, machine, load timings, probes and, on pgvector, executed plans.
 """
@@ -77,6 +78,47 @@ async def probe_fga_async(ctx: Context, user: str, key: str) -> dict:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:500]}
 
 
+def subset_size(arm: str, share: float | None) -> tuple[int | None, int | None]:
+    """(users, questions per user) that an arm answers in a layout; None means all. Pre-registered
+    (section 6): A0 is a harness check, and A3's cost grows with the readable share (pilot timings:
+    15 to 35 s a query at share 0.5)."""
+    if arm == "a0":
+        return None, 1
+    if arm != "a3-spicedb" or share is None or share <= 0.01:
+        return None, None
+    if share <= 0.05:
+        return None, 3
+    if share <= 0.2:
+        return None, 1
+    return 50, 1
+
+
+def arm_pairs(name: str, pairs: list[tuple], seed: int) -> list[tuple]:
+    """The pairs an arm answers. The subset depends only on the seed and the layout, so both settings
+    of an arm, and A0, see the same users."""
+    arm = name.partition("@")[0]
+    by_layout: dict[str, list[tuple]] = {}
+    for pair in pairs:
+        by_layout.setdefault(pair[0].name, []).append(pair)
+    out: list[tuple] = []
+    for layout_name, chosen in by_layout.items():
+        users_n, per_user = subset_size(arm, chosen[0][0].params.get("share"))
+        if users_n is None and per_user is None:
+            out += chosen
+            continue
+        rng = random.Random(f"{seed}:{layout_name}")
+        by_user: dict[str, list[tuple]] = {}
+        for pair in chosen:
+            by_user.setdefault(pair[1], []).append(pair)
+        users = sorted(by_user)
+        rng.shuffle(users)
+        for user in users[:users_n]:
+            questions = sorted(by_user[user], key=lambda pair: pair[2])
+            rng.shuffle(questions)
+            out += questions[:per_user]
+    return out
+
+
 async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int, warmup: int) -> list[dict]:
     rng = random.Random(seed)
     order = list(names)
@@ -84,12 +126,13 @@ async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int,
     rows: list[dict] = []
     for name in order:
         run = arms.build(name, ctx)
-        for layout, user, q in rng.sample(pairs, min(warmup, len(pairs))):
+        own = arm_pairs(name, pairs, seed)
+        for layout, user, q in rng.sample(own, min(warmup, len(own))):
             try:
                 await run(user, layout.user_groups.get(user, []), f"q{q}")
             except Exception:  # noqa: BLE001 - warm-up failures show up again when measured
                 pass
-        sequence = list(pairs)
+        sequence = list(own)
         rng.shuffle(sequence)
         started = time.perf_counter()
         errors = 0
@@ -136,7 +179,7 @@ def main() -> None:
     p.add_argument("--store", required=True)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--seed", type=int, default=1)
-    p.add_argument("--warmup", type=int, default=20)
+    p.add_argument("--warmup", type=int, default=10)
     p.add_argument("--arms", default="")
     p.add_argument("--layouts", default="")
     p.add_argument("--settle", type=float, default=10.0, help="seconds between loading and the first query")

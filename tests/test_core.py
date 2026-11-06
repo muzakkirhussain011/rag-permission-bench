@@ -61,3 +61,26 @@ def test_engine_tuples_are_unique_and_complete(tmp_path):
     members = {(t.resource_id, t.subject_id) for t in all_tuples if t.resource_type == "group"}
     expected = {(g, u) for layout in w.layouts for u, gs in layout.user_groups.items() for g in gs}
     assert members == expected
+
+
+def test_a0_and_a3_answer_the_preregistered_subsets():
+    from bench.run import arm_pairs
+
+    def layout(name, share, users=100, per_user=10):
+        queries = [(f"{name}_u{u}", u * per_user + j) for u in range(users) for j in range(per_user)]
+        return Layout(name, {u: [] for u, _ in queries}, queries, {"share": share})
+
+    layouts = [layout("a", 0.01), layout("b", 0.05), layout("c", 0.2), layout("d", 0.5)]
+    pairs = [(lay, u, q) for lay in layouts for u, q in lay.queries]
+
+    def counts(arm):
+        chosen = arm_pairs(arm, pairs, seed=7)
+        return {lay.name: (len({u for x, u, _ in chosen if x is lay}), sum(x is lay for x, _, _ in chosen))
+                for lay in layouts}
+
+    assert counts("a3-spicedb@default") == {"a": (100, 1000), "b": (100, 300), "c": (100, 100), "d": (50, 50)}
+    assert counts("a0") == {name: (100, 100) for name in "abcd"}
+    assert counts("a4@default") == {name: (100, 1000) for name in "abcd"}
+    assert arm_pairs("a3-spicedb@default", pairs, 7) == arm_pairs("a3-spicedb@iterative", pairs, 7)
+    assert arm_pairs("a3-spicedb@default", pairs, 7) != arm_pairs("a3-spicedb@default", pairs, 8)
+    assert arm_pairs("a3-spicedb@default", [(lay, u, q) for lay, u, q in pairs if lay.name == "a"][:5], 7)
