@@ -7,22 +7,42 @@ Changes after deposit go in a dated amendments section at the end, never in plac
 ## 1. Status at writing
 
 - No measured run of this study exists. Pilots only check that the harness runs and how long each arm takes:
-  `bench.timing` reports their latencies and errors, recall is never computed for them, and they are never reported.
-  Pilot latencies and errors bear on H4; H1 to H8 were committed publicly (commit c757b4c, 2026-11-06) before any
-  run on real data, and their wording has not changed since.
+  `bench.timing` reports their latencies and errors and, on pgvector, the shape of the recorded plans without row
+  counts; recall is never computed for them, and they are never reported. H1 to H8 were committed publicly
+  (commit c757b4c, 2026-11-06) before any run on real data, and their wording has not changed since.
 - What the author already knows: the source code and documentation of the integrations and stores named in section 3,
   read 2026-11-06 (notes file); results of the author's earlier preprint on wardowl ("Testing Permission-Aware
   Retrieval for RAG across Vector Stores and Authorization Engines", archive 10.5281/zenodo.23874614), which used other
   data and measured only wardowl, plus one row-level-security side run. wardowl is the author's own library: a declared
   conflict of interest.
-- Seen while testing the harness, before deposit: the CI runs on a small synthetic workload (random vectors, 3,000
-  chunks; `bench.devdata`), whose numbers check the harness and say nothing about any arm. One observation is
-  disclosed because it shapes an arm: auth0-ai-langchain 1.0.1's `FGARetriever.ainvoke` raised
-  `TypeError: unhashable type: 'Document'` on every store (langchain-core 0.3.86, the newest its package allows).
-  Arm A1-FGA therefore uses `invoke`, as Auth0's README does, and the async failure is reported as a finding.
-  Also seen on that synthetic workload, and disclosed because they concern exploratory measures: OpenSearch
-  document-level security (A5) returned fewer than k hits for users who may read few chunks; and in the short
-  change runs, revocations took about 2 s to show on arms that ask SpiceDB, and under 0.2 s on the others.
+- Seen while testing the harness, before deposit, on a small synthetic workload (random vectors, 3,000 chunks;
+  `bench.devdata`) in CI. These numbers check the harness and are not results of the study; they are disclosed
+  where they bear on an arm or a hypothesis.
+  - auth0-ai-langchain 1.0.1's `FGARetriever.ainvoke` raised `TypeError: unhashable type: 'Document'` on every store
+    (langchain-core 0.3.86, the newest its package allows). Arm A1-FGA therefore uses `invoke`, as Auth0's README
+    does, and the async failure is reported as a finding.
+  - OpenSearch document-level security (A5) returned fewer than k hits for users who may read few chunks.
+  - In the short change runs, revocations took about 2 s to show on arms that ask SpiceDB, and under 0.2 s on the
+    others.
+  - The fault job printed outside, empty and error counts per arm and fault (20 queries, pgvector). Outside was
+    zero in all 72 rows; with the engine stopped (H8's condition), every arm that asks an engine raised an error on
+    every query.
+- Seen in pilots on the real workloads, before deposit:
+  - Loading at full size: OpenSearch's security API refused a document-level-security role whose query string was
+    longer than 4,096 characters, so a role per user listing all their principals cannot be created; A5 on
+    OpenSearch uses one role per principal (section 3).
+  - Timings (seed 102, 20 pairs per layout): A3's median latency at share 0.5 was 15 to 35 s on the four stores
+    that finished (pgvector, Qdrant, Milvus, Weaviate), above H4's 10 s. H4 is therefore not a blind prediction,
+    and the paper will say so.
+  - In the same pilot A4 on pgvector took as long as A0, the exact control, in every layout. To check that the
+    pgvector settings took effect, the author read the executed plans recorded for one query in each of three
+    layouts (shares 0.001, 0.01 and 0.5, negative correlation). Those plans include row counts. At share 0.001
+    every setting used the GIN index and an exact sort. At share 0.01, A4 and A5 at the default setting used the
+    HNSW index and returned no rows for that query, and the iterative setting returned ten. At share 0.5 the HNSW
+    settings returned ten rows. H5 concerns the share-0.01 case; its wording was already fixed. Since then pilots
+    print plan shapes only. The plans were made with each query's own parameters, while the measured queries ran
+    through psycopg's automatic prepared statements, under which PostgreSQL may reuse one generic plan; the
+    harness now plans every pgvector query with its own parameters (section 3).
 
 ## 2. Questions
 
@@ -39,16 +59,17 @@ Changes after deposit go in a dated amendments section at the end, never in plac
 | A1 | Post-filter, exact k | auth0-ai-langchain `FGARetriever` 1.0.1 on a self-hosted OpenFGA; langchain-spicedb 0.2.0 `SpiceDBAuthFilter` |
 | A2 | Post-filter, over-fetch | A1 with 3k and with 10k candidates, then the first k readable |
 | A3 | Engine pre-filter | langchain-spicedb 0.2.0 `SpiceDBPreFilterRetriever`, under each store setting |
-| A4 | Reader groups on chunks | each store's filtered search at its default and at its documented alternative setting |
+| A4 | Reader groups on chunks | each store's filtered search at its default and at its documented alternative setting; OpenSearch has one setting, the filter inside the k-NN query, which its documentation calls efficient filtering (H6 uses it) |
 | A5 | Database-native | PostgreSQL row-level security with pgvector; OpenSearch document-level security (one role per principal, each user mapped to the roles of their principals) |
 | A6 | Partitioning | one pgvector table and HNSW index per role (W2) or per user (W1), searched and merged; HoneyBee if its authors license the code |
 | A7 | wardowl | one commit, pinned before deposit, on pgvector and Qdrant |
 
 Stores: pgvector, Qdrant, Milvus, Weaviate, OpenSearch; exact versions in `compose.yml` and the lock file, image
 digests recorded with every run. HNSW is built with m = 16 and ef_construction = 100 and searched with ef = 100 on
-every store, so that stores differ in how they filter, not in index breadth. Engines: SpiceDB and OpenFGA, both on
-PostgreSQL, pinned the same way. Third-party integrations run as installed from PyPI; the harness only supplies the
-store underneath them. k = 10 throughout.
+every store, so that stores differ in how they filter, not in index breadth. On pgvector every query is planned
+with its own parameters (psycopg's automatic prepared statements are off), and the executed plan of one query per
+layout and setting is recorded. Engines: SpiceDB and OpenFGA, both on PostgreSQL, pinned the same way. Third-party
+integrations run as installed from PyPI; the harness only supplies the store underneath them. k = 10 throughout.
 
 ## 4. Workloads
 
@@ -83,6 +104,9 @@ store underneath them. k = 10 throughout.
 - **Empty answer**: zero hits for a user who can read at least 10 chunks.
 - **Outside**: any returned chunk not in the user's readable set at query time. Counted in every run, not only fault runs.
 - **Latency**: wall time from the call into the arm to its return, embedding excluded; p50 and p99 per job.
+- **Timeout** (H4): calls are not cut off by the harness. For H4 a call that takes longer than 30 s counts as a
+  failure; every other measure uses what the call returned. OpenSearch's client gives up on a search after 30 s,
+  which is an error.
 - **Throughput**: not measured with concurrent clients; every arm answers one query at a time from one client.
 - **Memory and storage**: store-reported index and data size where the store reports it; container memory after the
   measured pass (`docker stats`).
@@ -96,10 +120,18 @@ store underneath them. k = 10 throughout.
 
 ## 6. Procedure
 
-- Every measured run is a GitHub Actions job on a GitHub-hosted runner from the public repository's docker compose files.
+- Every measured run is a GitHub Actions job on a GitHub-hosted runner from the public repository's docker compose
+  files (`cell.yml`, label `measured`); a job may run at most 6 hours.
 - A cell is (workload, store, setting). Every arm that can run on a cell runs in the same job, in an order drawn from a
-  seed logged with the job; one warm-up pass per arm is discarded.
-- At least five jobs per cell, on different runners. Comparisons between arms are made within a job.
+  seed logged with the job; ten warm-up queries per arm, drawn from its own pairs, are discarded.
+- Five seeds per cell (1 to 5), each on its own runner. A W1 or W2 job runs the whole workload on one store; a W3 job
+  runs one readable share (its three correlation layouts) on one store, because a whole W3 seed takes longer than a
+  job may run. Comparisons between arms are made within a job.
+- Every arm answers every pair, except two. A0, a harness check, answers one question per user. A3 answers, in W3,
+  every pair up to share 0.01, three questions per user at share 0.05, one at 0.2, and one question for 50 of the
+  100 users at 0.5 (its pilot medians at 0.5 were 15 to 35 s a query). The subset depends only on the seed and the
+  layout, so both settings of A3 see the same pairs (`bench/run.py`, `arm_pairs`).
+- Change runs (`bench.churn`) and fault runs (`bench.faults`) are one job per seed on each store, on W3.
 - Raw outputs kept for every query: the k hit ids with scores, latency, errors.
 
 ## 7. Hypotheses
