@@ -83,6 +83,9 @@ jobs:
       - run: python -m bench.truth --workload data/dev
       - run: python -m bench.run --workload data/dev --store ${{ matrix.store }} --out results/dev-${{ matrix.store }}.jsonl.gz ${{ matrix.store == 'pgvector' && '--partitions' || '' }}
       - run: python -m bench.analyze --workload data/dev --run results/dev-${{ matrix.store }}.jsonl.gz --check
+      - name: FGARetriever checks (outside the measured arms)
+        if: matrix.store == 'pgvector'
+        run: python -m bench.probe_fga --workload data/dev --meta results/dev-pgvector.meta.json --out results/probe-fga.json
       - name: Permission changes, briefly (fresh servers)
         run: |
           docker compose --profile ${{ matrix.store }} --profile authz down -v
