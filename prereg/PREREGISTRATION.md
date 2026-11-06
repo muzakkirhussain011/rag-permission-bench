@@ -111,6 +111,25 @@ wholly on the predicted side, **not supported** if wholly on the other side, oth
 - **H7** In W3, A5 on pgvector and A4 on pgvector with the same scan settings differ in mean recall@10 by less than 0.02.
 - **H8** With the engine stopped, no arm returns a chunk outside the readable set.
 
+How each is judged (`bench/report.py`). A hypothesis over several cells is supported only if it is supported in every
+cell, not supported if it is not supported in any cell, and inconclusive otherwise (an intersection-union rule, so
+each cell's interval keeps the 99.375% level).
+
+- H1, H2: cells are (store, implementation) on W1's own-mail pairs; the implementations are FGA and SpiceDB, which
+  post-filter the same base search.
+- H3: cells are (store, share 0.001, 0.01 or 0.05, post-filter arm); the interval is for mean(negative) minus
+  mean(positive), with the users of each layout resampled independently; predicted side: below 0.
+- H4: per store, the A3 cells at share 0.5 (both store settings, three correlations) meet the condition if in every
+  one more than half the queries failed or the median of the jobs' p50 latencies exceeds 10 s. Supported if at least
+  one store meets it, not supported otherwise. No interval: these are counts and medians.
+- H5: cells are the three correlation layouts at share 0.01.
+- H6: cells are (store, layout) for the five alternative settings and fifteen layouts; supported where the lower end
+  is at least 0.9, not supported where the upper end is below 0.9.
+- H7: cells are (setting default or iterative, layout); the interval is for the per-user mean of paired differences
+  (A5 minus A4, same job, user and question); supported where it lies inside (-0.02, 0.02), not supported where it
+  lies wholly outside.
+- H8: a count over every fault run with engines refusing connections; supported if it is zero.
+
 ## 8. Analysis
 
 - Unit: the user. Per-query values are averaged per user, then over users.

@@ -23,6 +23,7 @@ import asyncio
 import json
 import random
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -44,22 +45,26 @@ FAULTS = ("none", "stopped", "slow", "cut")
 def _toxi(method: str, path: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(API + path, data=data, method=method, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=10) as response:
-        raw = response.read()
-        return json.loads(raw) if raw else {}
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            raw = response.read()
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as error:
+        if method == "DELETE" and error.code == 404:
+            return {}
+        raise
 
 
 def setup_proxies() -> None:
     retry(lambda: _toxi("GET", "/version"), "Toxiproxy")
-    for name, (listen, upstream) in PROXIES.items():
-        _toxi("POST", "/proxies", {"name": name, "listen": listen, "upstream": upstream, "enabled": True})
 
 
 def apply(fault: str, cut_bytes: int) -> None:
-    for name in PROXIES:
-        _toxi("POST", f"/proxies/{name}", {"enabled": fault != "stopped"})
-        for toxic in _toxi("GET", f"/proxies/{name}/toxics"):
-            _toxi("DELETE", f"/proxies/{name}/toxics/{toxic['name']}")
+    """Recreate every proxy for this fault. Deleting a proxy drops its open connections, so no
+    client carries a connection, or a toxic's backlog, from one fault into the next."""
+    for name, (listen, upstream) in PROXIES.items():
+        _toxi("DELETE", f"/proxies/{name}")
+        _toxi("POST", "/proxies", {"name": name, "listen": listen, "upstream": upstream, "enabled": fault != "stopped"})
         if fault == "slow":
             _toxi("POST", f"/proxies/{name}/toxics", {"name": "slow", "type": "latency", "stream": "downstream",
                                                       "attributes": {"latency": 2000, "jitter": 0}})

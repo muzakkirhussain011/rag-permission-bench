@@ -33,7 +33,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .util import log, sha256, write_json
+from .util import log, read_json, sha256, write_json
 from .workload import Layout, save
 
 MODEL = "BAAI/bge-small-en-v1.5"
@@ -100,19 +100,34 @@ def main() -> None:
     from fastembed import TextEmbedding
 
     p = argparse.ArgumentParser()
-    p.add_argument("--tarball", type=Path, required=True)
+    p.add_argument("--tarball", type=Path, required=True)  # the CMU file; every job reads it itself
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--users", type=int, default=200)
     p.add_argument("--min-readable", type=int, default=50)
     p.add_argument("--per-kind", type=int, default=10)
     p.add_argument("--seed", type=int, default=19)
     p.add_argument("--limit", type=int, default=0, help="read only the first N unique messages (tests)")
+    p.add_argument("--shard", type=int, default=None, help="embed only shard I of --shards (vectors only) and stop")
+    p.add_argument("--shards", type=int, default=1)
+    p.add_argument("--assemble", type=Path, default=None, help="take the message vectors from shard_*.npy here")
     args = p.parse_args()
     rng = np.random.default_rng(args.seed)
+    args.out.mkdir(parents=True, exist_ok=True)
 
     subjects, texts, readers, counts = read_messages(args.tarball)
     if args.limit:
         subjects, texts, readers = subjects[: args.limit], texts[: args.limit], readers[: args.limit]
+    bounds = np.linspace(0, len(texts), args.shards + 1).astype(int)
+    model = TextEmbedding(MODEL, cache_dir=str(args.out.parent / "fastembed_cache"))
+    if args.shard is not None:
+        start, stop = int(bounds[args.shard]), int(bounds[args.shard + 1])
+        began = time.perf_counter()
+        part = np.stack(list(model.passage_embed(texts[start:stop], batch_size=32, parallel=0)))
+        np.save(args.out / f"shard_{args.shard}.npy", part)
+        write_json(args.out / f"shard_{args.shard}.json", {"start": start, "stop": stop, "messages": len(texts),
+                                                           "seconds": time.perf_counter() - began})
+        log(f"shard {args.shard}: messages {start} to {stop} in {time.perf_counter() - began:.0f} s")
+        return
     addresses = sorted({a for r in readers for a in r})
     number = {a: i for i, a in enumerate(addresses)}
     chunk_users = [sorted(number[a] for a in r) for r in readers]
@@ -150,11 +165,20 @@ def main() -> None:
                 kinds[f"u{u}|{q}"] = kind
     log(f"{len(chosen)} users, {len(pairs)} pairs, {len(query_texts)} distinct questions")
 
-    model = TextEmbedding(MODEL, cache_dir=str(args.out.parent / "fastembed_cache"))
     started = time.perf_counter()
-    vectors = np.stack(list(model.passage_embed(texts, batch_size=64)))
+    if args.assemble is not None:
+        parts, seconds = [], 0.0
+        for i in range(args.shards):
+            meta = read_json(args.assemble / f"shard_{i}.json")
+            if (meta["start"], meta["stop"], meta["messages"]) != (int(bounds[i]), int(bounds[i + 1]), len(texts)):
+                raise ValueError(f"shard {i} does not match this reading of the corpus: {meta}")
+            parts.append(np.load(args.assemble / f"shard_{i}.npy"))
+            seconds += meta["seconds"]
+        vectors = np.concatenate(parts)
+    else:
+        vectors = np.stack(list(model.passage_embed(texts, batch_size=32, parallel=0)))
+        seconds = time.perf_counter() - started
     queries = np.stack(list(model.query_embed(list(query_texts))))
-    seconds = time.perf_counter() - started
     unit = lambda x: (x / np.linalg.norm(x, axis=1, keepdims=True)).astype(np.float32)  # noqa: E731
     layout = Layout("w1_enron", {}, pairs, {"kinds": kinds, "min_readable": args.min_readable})
     save(args.out, name="w1_enron", vectors=unit(vectors), queries=unit(queries), chunk_users=chunk_users,

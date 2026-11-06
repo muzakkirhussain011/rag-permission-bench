@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .util import log, sha256, write_json
+from .util import log, read_json, sha256, write_json
 
 CORPUS = ("BeIR/msmarco", "a918e0d11a77ed33f42f29d98340b655593b96ad")
 QRELS = ("BeIR/msmarco-qrels", "253fbf8a3f8d4a0932b63882b5162bedc84779f5")
@@ -61,32 +61,68 @@ def questions(count: int, seed: int) -> list[dict]:
     return [{"id": unique[i], "text": text[unique[i]].strip()} for i in sorted(chosen)]
 
 
-def main() -> None:
+def _model(cache: Path):  # noqa: ANN202
     from fastembed import TextEmbedding
 
+    return TextEmbedding(MODEL, cache_dir=str(cache))
+
+
+def _embed(model, texts: list[str], batch: int, parallel: int | None) -> np.ndarray:  # noqa: ANN001
+    started = time.perf_counter()
+    vectors = np.empty((len(texts), 384), dtype=np.float32)
+    done = 0
+    for vector in model.passage_embed(texts, batch_size=batch, parallel=parallel):
+        vectors[done] = vector
+        done += 1
+        if done % 20_000 == 0:
+            log(f"embedded {done} passages, {done / (time.perf_counter() - started):.0f} per second")
+    return vectors
+
+
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--n", type=int, default=1_000_000)
     p.add_argument("--queries", type=int, default=300)
     p.add_argument("--seed", type=int, default=11)
-    p.add_argument("--batch", type=int, default=256)
+    p.add_argument("--batch", type=int, default=32)
+    p.add_argument("--parallel", type=int, default=0, help="fastembed's data-parallel workers (0: one per core)")
+    p.add_argument("--shard", type=int, default=None, help="embed only shard I of --shards and stop")
+    p.add_argument("--shards", type=int, default=1)
+    p.add_argument("--assemble", type=Path, default=None, help="join shard_*.npy from this directory")
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    cache = args.out.parent / "fastembed_cache"
+    parallel = args.parallel if args.parallel >= 0 else None
 
     ids, texts = passages(args.n)
     log(f"{len(ids)} passages read")
-    qs = questions(args.queries, args.seed)
-    cache = args.out.parent / "fastembed_cache"
-    model = TextEmbedding(MODEL, cache_dir=str(cache))
+    bounds = np.linspace(0, len(texts), args.shards + 1).astype(int)
+    if args.shard is not None:
+        start, stop = int(bounds[args.shard]), int(bounds[args.shard + 1])
+        began = time.perf_counter()
+        part = _embed(_model(cache), texts[start:stop], args.batch, parallel)
+        np.save(args.out / f"shard_{args.shard}.npy", part)
+        write_json(args.out / f"shard_{args.shard}.json", {"start": start, "stop": stop,
+                                                           "seconds": time.perf_counter() - began})
+        log(f"shard {args.shard}: passages {start} to {stop} in {time.perf_counter() - began:.0f} s")
+        return
+    model = _model(cache)
     started = time.perf_counter()
-    vectors = np.empty((len(texts), 384), dtype=np.float32)
-    done = 0
-    for vector in model.passage_embed(texts, batch_size=args.batch):
-        vectors[done] = vector
-        done += 1
-        if done % 100_000 == 0:
-            log(f"embedded {done} passages, {done / (time.perf_counter() - started):.0f} per second")
-    seconds = time.perf_counter() - started
+    if args.assemble is not None:
+        parts, info = [], []
+        for i in range(args.shards):
+            meta = read_json(args.assemble / f"shard_{i}.json")
+            if meta["start"] != int(bounds[i]) or meta["stop"] != int(bounds[i + 1]):
+                raise ValueError(f"shard {i} covers {meta['start']}-{meta['stop']}, not {bounds[i]}-{bounds[i + 1]}")
+            parts.append(np.load(args.assemble / f"shard_{i}.npy"))
+            info.append(meta)
+        vectors = np.concatenate(parts)
+        seconds = sum(m["seconds"] for m in info)
+    else:
+        vectors = _embed(model, texts, args.batch, parallel)
+        seconds = time.perf_counter() - started
+    qs = questions(args.queries, args.seed)
     query_vectors = np.stack(list(model.query_embed([q["text"] for q in qs])))
     np.save(args.out / "vectors.npy", _unit(vectors))
     np.save(args.out / "queries.npy", _unit(query_vectors))
@@ -99,9 +135,9 @@ def main() -> None:
         "corpus": {"repo": CORPUS[0], "revision": CORPUS[1], "file": "corpus/corpus-00000-of-00001.parquet",
                    "first": len(ids)},
         "questions": {"repo": QRELS[0], "revision": QRELS[1], "split": "dev", "count": len(qs), "seed": args.seed},
-        "model": {"name": MODEL, "library": "fastembed",
+        "model": {"name": MODEL, "library": "fastembed", "batch": args.batch, "parallel": args.parallel,
                   "onnx": {str(f.relative_to(cache)): sha256(f) for f in model_files}},
-        "embed_s": seconds,
+        "embed_s": seconds, "shards": args.shards,
         "sha256": {f: sha256(args.out / f) for f in files},
     })
     log(f"embedded {len(ids)} passages in {seconds:.0f} s")

@@ -1,6 +1,8 @@
 name: prepare
 
-# Builds the MS MARCO corpus (embedded on this runner's CPU), the W3 sweep and its exact answers.
+# Builds the MS MARCO corpus, the W3 sweep, the four W2 workloads and their exact answers.
+# Embedding runs on CPU, split into `shards` parallel jobs (a 4-CPU runner embeds about 28 passages a
+# second); one job then joins the shards in order and builds everything else.
 # With `publish`, the files go to a GitHub release; otherwise they are kept as a workflow artifact.
 
 on:
@@ -21,7 +23,28 @@ permissions:
   contents: write
 
 jobs:
-  msmarco:
+  embed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-data.txt
+      - run: python -m bench.data_msmarco --out data/shards --n ${{ inputs.n }} --shard ${{ matrix.shard }} --shards 16
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: data/shards/shard_${{ matrix.shard }}.*
+          retention-days: 3
+
+  build:
+    needs: embed
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -34,7 +57,13 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h / && nproc && free -g
       - run: pip install -r requirements-data.txt && pip freeze --all
-      - run: python -m bench.data_msmarco --out data/msmarco --n ${{ inputs.n }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: data/shards
+          merge-multiple: true
+      - run: ls -la data/shards
+      - run: python -m bench.data_msmarco --out data/msmarco --n ${{ inputs.n }} --shards 16 --assemble data/shards
       - run: python -m bench.w3 --corpus data/msmarco --out data/w3
       - run: python -m bench.truth --workload data/w3
       - name: W2, HoneyBee's four RBAC workloads, on the first 200,000 passages
@@ -67,5 +96,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ inputs.release }}" data/out/* \
-            --title "Data: MS MARCO (${{ inputs.n }} passages) and the W3 sweep" \
-            --notes "Built by run ${{ github.run_id }} at commit ${{ github.sha }} with bench.data_msmarco, bench.w3 and bench.truth. Checksums in SHA256SUMS; sources and model in corpus-meta.json."
+            --title "Data: MS MARCO (${{ inputs.n }} passages), the W3 sweep and the four W2 workloads" \
+            --notes "Built by run ${{ github.run_id }} at commit ${{ github.sha }} with bench.data_msmarco (16 CPU shards), bench.w3, bench.w2 and bench.truth. Checksums in SHA256SUMS; sources and model in corpus-meta.json."

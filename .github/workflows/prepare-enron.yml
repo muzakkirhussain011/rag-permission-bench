@@ -22,7 +22,29 @@ permissions:
   contents: write
 
 jobs:
+  embed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-data.txt
+      - run: curl -L --fail --retry 3 -o enron.tar.gz https://www.cs.cmu.edu/~enron/enron_mail_20150507.tar.gz
+      - run: python -m bench.w1_enron --tarball enron.tar.gz --out data/shards --limit ${{ inputs.limit }} --shard ${{ matrix.shard }} --shards 12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: enron-shard-${{ matrix.shard }}
+          path: data/shards/shard_${{ matrix.shard }}.*
+          retention-days: 3
+
   enron:
+    needs: embed
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -39,7 +61,12 @@ jobs:
         run: |
           curl -L --fail --retry 3 -o enron.tar.gz https://www.cs.cmu.edu/~enron/enron_mail_20150507.tar.gz
           ls -la enron.tar.gz && sha256sum enron.tar.gz
-      - run: python -m bench.w1_enron --tarball enron.tar.gz --out data/w1 --limit ${{ inputs.limit }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: enron-shard-*
+          path: data/shards
+          merge-multiple: true
+      - run: python -m bench.w1_enron --tarball enron.tar.gz --out data/w1 --limit ${{ inputs.limit }} --shards 12 --assemble data/shards
       - run: python -m bench.truth --workload data/w1
       - name: Package
         run: |
