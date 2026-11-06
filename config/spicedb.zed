@@ -1,0 +1,12 @@
+// One schema for every workload: a chunk is readable by users named on it directly (Enron)
+// and by members of groups named on it (roles in the RBAC workloads, folders in the sweep).
+definition user {}
+
+definition group {
+	relation member: user
+}
+
+definition chunk {
+	relation reader: user | group#member
+	permission view = reader
+}

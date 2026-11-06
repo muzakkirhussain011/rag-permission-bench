@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {"type": "user"},
+    {
+      "type": "group",
+      "relations": {"member": {"this": {}}},
+      "metadata": {"relations": {"member": {"directly_related_user_types": [{"type": "user"}]}}}
+    },
+    {
+      "type": "chunk",
+      "relations": {
+        "reader": {"this": {}},
+        "viewer": {"computedUserset": {"relation": "reader"}}
+      },
+      "metadata": {
+        "relations": {
+          "reader": {"directly_related_user_types": [{"type": "user"}, {"type": "group", "relation": "member"}]},
+          "viewer": {"directly_related_user_types": []}
+        }
+      }
+    }
+  ]
+}

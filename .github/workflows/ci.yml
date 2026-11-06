@@ -1,0 +1,67 @@
+name: ci
+
+# Unit tests, then the whole harness end to end on the small synthetic workload, per store.
+# The synthetic numbers check the harness (bench.analyze --check), not any hypothesis.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-run.txt
+      - name: Record the resolved packages
+        run: pip freeze --all | tee requirements-resolved.txt
+      - name: Print the installed integration code that the arms run
+        run: |
+          python - <<'EOF'
+          import inspect, auth0_ai_langchain, langchain_spicedb
+          from auth0_ai_langchain import FGARetriever
+          from langchain_spicedb import retrievers, core
+          print(inspect.getsource(FGARetriever))
+          print(inspect.getsource(retrievers))
+          print(inspect.getsource(core.SpiceDBAuthorizer.lookup_resources))
+          EOF
+      - run: python -m pytest -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: requirements-resolved
+          path: requirements-resolved.txt
+
+  e2e:
+    needs: unit
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        store: [pgvector, qdrant]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-run.txt
+      - name: Start the store and both engines
+        run: docker compose --profile ${{ matrix.store }} --profile authz up -d
+      - run: python -m bench.devdata --out data/dev
+      - run: python -m bench.truth --workload data/dev
+      - run: python -m bench.run --workload data/dev --store ${{ matrix.store }} --out results/dev-${{ matrix.store }}.jsonl.gz
+      - run: python -m bench.analyze --workload data/dev --run results/dev-${{ matrix.store }}.jsonl.gz --check
+      - if: always()
+        run: docker compose --profile ${{ matrix.store }} --profile authz logs --no-color > results/compose.log 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-${{ matrix.store }}
+          path: results/

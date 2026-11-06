@@ -1,0 +1,12 @@
+# What the harness imports. auth0-ai-langchain 1.0.1 needs langchain-core < 0.4 and openfga-sdk < 0.10,
+# so every arm uses the same langchain-core 0.3 line. The full resolved set is in requirements-lock.txt.
+psycopg[binary]==3.3.8
+pgvector==0.5.1
+qdrant-client==1.20.0
+authzed==1.25.0
+openfga-sdk==0.9.9
+langchain-core==0.3.86
+langchain-spicedb==0.2.0
+auth0-ai-langchain==1.0.1
+numpy
+pytest==9.2.0

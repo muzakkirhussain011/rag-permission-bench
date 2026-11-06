@@ -1,0 +1,82 @@
+# Every server the benchmark runs against. Start only what a cell needs with profiles, e.g.
+#   docker compose --profile pgvector --profile authz up -d
+# Versions are pinned here and recorded with every run (bench/run.py writes `docker compose images`).
+name: bench
+
+services:
+  pgvector:
+    image: pgvector/pgvector:0.8.7-pg17-trixie
+    profiles: [pgvector]
+    environment:
+      POSTGRES_PASSWORD: bench
+      POSTGRES_DB: bench
+    command: ["postgres", "-c", "shared_buffers=2GB", "-c", "maintenance_work_mem=2GB",
+              "-c", "max_parallel_maintenance_workers=3", "-c", "work_mem=64MB"]
+    shm_size: 2gb
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      retries: 60
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    profiles: [qdrant]
+    ports: ["6333:6333", "6334:6334"]
+
+  # One PostgreSQL holds both authorization engines' data, as a production deployment would
+  # (neither engine runs on its in-memory store here).
+  authzdb:
+    image: postgres:17.11-trixie
+    profiles: [authz]
+    environment:
+      POSTGRES_PASSWORD: authz
+      POSTGRES_DB: spicedb
+    volumes:
+      - ./config/authzdb-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -lqt | cut -d '|' -f1 | grep -qw openfga"]
+      interval: 2s
+      retries: 60
+
+  spicedb-migrate:
+    image: authzed/spicedb:v1.57.0
+    profiles: [authz]
+    command: ["migrate", "head", "--datastore-engine", "postgres",
+              "--datastore-conn-uri", "postgres://postgres:authz@authzdb:5432/spicedb?sslmode=disable"]
+    depends_on:
+      authzdb: {condition: service_healthy}
+
+  spicedb:
+    image: authzed/spicedb:v1.57.0
+    profiles: [authz]
+    command: ["serve", "--grpc-preshared-key", "bench", "--http-enabled",
+              "--datastore-engine", "postgres",
+              "--datastore-conn-uri", "postgres://postgres:authz@authzdb:5432/spicedb?sslmode=disable"]
+    ports: ["50051:50051", "8443:8443"]
+    depends_on:
+      spicedb-migrate: {condition: service_completed_successfully}
+
+  openfga-migrate:
+    image: openfga/openfga:v1.22.1
+    profiles: [authz]
+    command: ["migrate"]
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "postgres://postgres:authz@authzdb:5432/openfga?sslmode=disable"
+    depends_on:
+      authzdb: {condition: service_healthy}
+
+  openfga:
+    image: openfga/openfga:v1.22.1
+    profiles: [authz]
+    command: ["run"]
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "postgres://postgres:authz@authzdb:5432/openfga?sslmode=disable"
+      OPENFGA_PLAYGROUND_ENABLED: "false"
+      # Loading only: larger write batches. Query-time limits stay at their defaults.
+      OPENFGA_MAX_TUPLES_PER_WRITE: "1000"
+    ports: ["8080:8080"]
+    depends_on:
+      openfga-migrate: {condition: service_completed_successfully}

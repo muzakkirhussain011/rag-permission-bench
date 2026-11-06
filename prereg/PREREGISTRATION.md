@@ -1,0 +1,119 @@
+# Pre-registration (DRAFT, not deposited): enforcing document permissions in vector search
+
+Author: Syed Muzakkir Hussain. Draft of 2026-11-06, first made public in this repository the same day. Until the
+Zenodo deposit, which comes before the first measured run, every change to this file is visible in its git history.
+Changes after deposit go in a dated amendments section at the end, never in place.
+
+## 1. Status at writing
+
+- No measured run of this study exists. Pilots will only check that the harness runs; their numbers are never reported.
+- What the author already knows: the source code and documentation of the integrations and stores named in section 3,
+  read 2026-11-06 (notes file); results of the author's earlier preprint on wardowl ("Testing Permission-Aware
+  Retrieval for RAG across Vector Stores and Authorization Engines", archive 10.5281/zenodo.23874614), which used other
+  data and measured only wardowl, plus one row-level-security side run. wardowl is the author's own library: a declared
+  conflict of interest.
+
+## 2. Questions
+
+- **Q1 quality:** how much of the readable top 10 does each arm return, by readable share and by query-permission correlation?
+- **Q2 cost:** latency, throughput, memory, storage, build time.
+- **Q3 change:** after a grant or revocation at the source, how long until answers reflect it, and what does it cost?
+- **Q4 failure:** when a part fails, does an arm return chunks outside the readable set, return nothing, or raise an error?
+
+## 3. Arms
+
+| Arm | Strategy | Implementation, pinned version |
+|---|---|---|
+| A0 | Exact control | pgvector with index scans off and the user's principals as a filter; checks the harness |
+| A1 | Post-filter, exact k | auth0-ai-langchain `FGARetriever` 1.0.1 on a self-hosted OpenFGA; langchain-spicedb 0.2.0 `SpiceDBAuthFilter` |
+| A2 | Post-filter, over-fetch | A1 with 3k and with 10k candidates, then the first k readable |
+| A3 | Engine pre-filter | langchain-spicedb 0.2.0 `SpiceDBPreFilterRetriever`, under each store setting |
+| A4 | Reader groups on chunks | each store's filtered search at its default and at its documented alternative setting |
+| A5 | Database-native | PostgreSQL row-level security with pgvector; OpenSearch document-level security |
+| A6 | Partitioning | one collection per role; HoneyBee if licensed |
+| A7 | wardowl | one commit, pinned before deposit, on pgvector and Qdrant |
+
+Stores: pgvector, Qdrant, Milvus, Weaviate, OpenSearch; exact versions in `compose.yml` and the lock file, image
+digests recorded with every run. HNSW is built with m = 16 and ef_construction = 100 and searched with ef = 100 on
+every store, so that stores differ in how they filter, not in index breadth. Engines: SpiceDB and OpenFGA, both on
+PostgreSQL, pinned the same way. Third-party integrations run as installed from PyPI; the harness only supplies the
+store underneath them. k = 10 throughout.
+
+## 4. Workloads
+
+- **W1 Enron**, CMU release 2015-05-07. Messages deduplicated by Message-ID, then by a hash of the body. One chunk per
+  message: subject plus body, cut at the embedding model's limit. Readers: the addresses in From, To, Cc and Bcc.
+  Users: the addresses that can read at least 50 messages; 200 sampled, stratified by readable count (seed fixed).
+  Queries: per user, 10 subjects of messages that user can read ("own mail") and 10 subjects of messages they cannot
+  ("other mail"); subjects of fewer than three words are skipped. Addresses are replaced by numbers before any output.
+- **W2 RBAC generators**: Tree, Uniform and ERBAC with HoneyBee's published parameters (its section 6.2), 1,000 users,
+  100 roles, over 1M MS MARCO passages (BEIR, first 1,000,000) and 300 MS MARCO questions. One extra cell repeats
+  HoneyBee's own Wikipedia setting for comparison with its paper.
+- **W3 sweep**: the W2 corpus and questions. Readable share s in {0.001, 0.01, 0.05, 0.2, 0.5}; correlation in
+  {negative, none, positive}. The corpus is split into k-means clusters (k = 1,000), each a folder that a user is
+  granted whole. Positive grants the folders nearest the user's questions, none grants folders in random order,
+  negative grants the farthest, each until the share is reached. The achieved share and correlation (Amanbayev et
+  al.'s rho_q) are measured per query and reported; cells are labeled by what was achieved.
+- **Churn**: on each workload, grants and revocations at 1 and 10 per second for 10 minutes; for each change a probe
+  query whose exact top hit is the changed chunk, repeated every 100 ms until the answer reflects the change, capped at 60 s.
+- Embeddings: BAAI/bge-small-en-v1.5 through fastembed's ONNX build on CPU, normalized, computed once in GitHub
+  Actions; the model file's and every output file's SHA-256 are published.
+
+## 5. Measures
+
+- **Recall@10**: |returned ∩ exact readable top 10| / min(10, readable count). Exact top 10: brute force over the
+  user's readable chunks, inner product on normalized vectors, ties broken by chunk id; computed once and stored.
+- **Empty answer**: zero hits for a user who can read at least 10 chunks.
+- **Outside**: any returned chunk not in the user's readable set at query time. Counted in every run, not only fault runs.
+- **Latency**: wall time from the call into the arm to its return, embedding excluded; p50 and p99 per job.
+- **Throughput**: answers per second with 1 and 4 client threads.
+- **Memory and storage**: store-reported index and data size; container peak memory.
+- **Build time**: load and index time to queryable.
+- **Change delay**: time from the source acknowledging a change to the first probe that reflects it; probes still
+  wrong at 60 s are reported as censored.
+- **Faults**: engine stopped; engine delayed 2 s; LookupResources stream cut after half its IDs; an ID list above a
+  store's documented or observed request limit; a cache older than its TTL. For each: outside, empty, error counts.
+
+## 6. Procedure
+
+- Every measured run is a GitHub Actions job on a GitHub-hosted runner from the public repository's docker compose files.
+- A cell is (workload, store, setting). Every arm that can run on a cell runs in the same job, in an order drawn from a
+  seed logged with the job; one warm-up pass per arm is discarded.
+- At least five jobs per cell, on different runners. Comparisons between arms are made within a job.
+- Raw outputs kept for every query: the k hit ids with scores, latency, errors.
+
+## 7. Hypotheses
+
+Bonferroni over the eight: each is judged on a two-sided 99.375% interval (0.05 / 8). **Supported** if the interval lies
+wholly on the predicted side, **not supported** if wholly on the other side, otherwise **inconclusive**.
+
+- **H1** On W1 own-mail queries, A1 mean recall@10 is below 0.5.
+- **H2** On W1 own-mail queries, A2 with 10k candidates has mean recall@10 below 0.9.
+- **H3** In W3, at every share up to 0.05, A1 and A2 mean recall@10 is lower under negative than under positive correlation.
+- **H4** In W3 at share 0.5, A3 fails (error or timeout at 30 s) or has p50 latency above 10 s on at least one store.
+- **H5** In W3 at share 0.01, pgvector HNSW with iterative scans off has mean recall@10 below 0.5.
+- **H6** In W3, A4 at each store's alternative setting (pgvector iterative scans, Qdrant ACORN, Milvus iterative
+  filter, Weaviate PathSeer, OpenSearch efficient filtering) has mean recall@10 of at least 0.9 in every cell.
+- **H7** In W3, A5 on pgvector and A4 on pgvector with the same scan settings differ in mean recall@10 by less than 0.02.
+- **H8** With the engine stopped, no arm returns a chunk outside the readable set.
+
+## 8. Analysis
+
+- Unit: the user. Per-query values are averaged per user, then over users.
+- Intervals: bootstrap over users, 10,000 resamples, seed fixed in the analysis script; latency intervals over jobs.
+- Paired differences between arms use the same queries and the same users, from the same jobs.
+- All cells are reported, including those no hypothesis covers. Failed or censored measurements are counted, not dropped.
+
+## 9. Exploratory (no hypothesis, reported as such)
+
+Change delays per arm; costs of a change; OpenSearch DLS hit counts (security#6737 concerns hybrid queries; plain
+knn under DLS is untested in the docs read); W2 against HoneyBee's published numbers; other-mail queries on W1.
+
+## 10. Deviations
+
+Any change to arms, workloads, measures, procedure or analysis after deposit is dated, explained and listed in the
+paper. Cells that cannot run (for example a store that cannot take an arm) are reported as not run, with the reason.
+
+## Amendments
+
+None yet.

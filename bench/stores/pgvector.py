@@ -1,0 +1,156 @@
+"""pgvector: one table, an HNSW index on inner product, a GIN index on the principals.
+
+Settings: `default` leaves `hnsw.iterative_scan` off (pgvector's default: the filter applies after
+the index scan); `iterative` sets it to `relaxed_order`, which the pgvector README suggests for
+filtering; `exact` turns index scans off, which makes every answer exact (the control arm A0).
+
+Row-level security (arm A5) uses a second role, `bench_reader`, that is not the table's owner. Its
+policy compares the row's principals with the session setting `bench.principals`, which the
+application sets for each request.
+"""
+
+from __future__ import annotations
+
+import time
+
+import numpy as np
+
+from ..util import log, retry
+from ..workload import Workload
+from . import EF_CONSTRUCTION, EF_SEARCH, M
+
+DSN = "postgresql://postgres:bench@localhost:5432/bench"
+READER_DSN = "postgresql://bench_reader:reader@localhost:5432/bench"
+SETTINGS = {
+    "default": ["SET hnsw.iterative_scan = off", "SET enable_indexscan = on"],
+    "iterative": ["SET hnsw.iterative_scan = relaxed_order", "SET enable_indexscan = on"],
+    "exact": ["SET hnsw.iterative_scan = off", "SET enable_indexscan = off"],
+}
+SEARCH = (
+    "SELECT id, -(embedding <#> %(q)s) FROM chunks {where} ORDER BY embedding <#> %(q)s LIMIT %(k)s"
+)
+
+
+def _connect(dsn: str):  # noqa: ANN202
+    import psycopg
+    from pgvector.psycopg import register_vector
+
+    conn = psycopg.connect(dsn, autocommit=True)
+    register_vector(conn)
+    conn.execute(f"SET hnsw.ef_search = {EF_SEARCH}")
+    return conn
+
+
+class PgVector:
+    name = "pgvector"
+    settings = ("default", "iterative")
+
+    def __init__(self) -> None:
+        self.conn = None
+        self.reader = None
+        self.setting = None
+
+    def load(self, w: Workload) -> dict:
+        import psycopg
+        from pgvector.psycopg import register_vector
+
+        conn = retry(lambda: psycopg.connect(DSN, autocommit=True), "PostgreSQL")
+        conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        register_vector(conn)
+        conn.execute("DROP TABLE IF EXISTS chunks")
+        conn.execute(
+            f"CREATE TABLE chunks (id integer PRIMARY KEY, principals text[] NOT NULL,"
+            f" embedding vector({w.vectors.shape[1]}) NOT NULL)"
+        )
+        vector_oid = psycopg.types.TypeInfo.fetch(conn, "vector").oid
+        started = time.perf_counter()
+        with conn.cursor() as cur, cur.copy("COPY chunks (id, principals, embedding) FROM STDIN WITH (FORMAT BINARY)") as copy:
+            copy.set_types([23, 1009, vector_oid])  # int4, text[], vector
+            for i in range(w.n):
+                copy.write_row((i, w.chunk_principals(i), np.asarray(w.vectors[i], dtype=np.float32)))
+        loaded = time.perf_counter()
+        conn.execute("SET maintenance_work_mem = '2GB'")
+        conn.execute("SET max_parallel_maintenance_workers = 3")
+        conn.execute(
+            f"CREATE INDEX chunks_hnsw ON chunks USING hnsw (embedding vector_ip_ops)"
+            f" WITH (m = {M}, ef_construction = {EF_CONSTRUCTION})"
+        )
+        indexed = time.perf_counter()
+        conn.execute("CREATE INDEX chunks_principals ON chunks USING gin (principals)")
+        conn.execute("ANALYZE chunks")
+        conn.execute(
+            "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'bench_reader') THEN"
+            " CREATE ROLE bench_reader LOGIN PASSWORD 'reader' NOBYPASSRLS; END IF; END $$"
+        )
+        conn.execute("GRANT SELECT ON chunks TO bench_reader")
+        conn.execute("ALTER TABLE chunks ENABLE ROW LEVEL SECURITY")
+        conn.execute("DROP POLICY IF EXISTS readable ON chunks")
+        conn.execute(
+            "CREATE POLICY readable ON chunks FOR SELECT TO bench_reader"
+            " USING (principals && string_to_array(current_setting('bench.principals', true), ','))"
+        )
+        sizes = conn.execute(
+            "SELECT pg_table_size('chunks'), pg_relation_size('chunks_hnsw'), pg_relation_size('chunks_principals')"
+        ).fetchone()
+        conn.close()
+        log(f"pgvector: {w.n} rows in {loaded - started:.0f} s, HNSW in {indexed - loaded:.0f} s")
+        return {
+            "load_s": loaded - started,
+            "index_s": indexed - loaded,
+            "table_bytes": sizes[0],
+            "hnsw_bytes": sizes[1],
+            "gin_bytes": sizes[2],
+        }
+
+    def open(self) -> None:
+        self.conn = _connect(DSN)
+        self.reader = _connect(READER_DSN)
+
+    def configure(self, setting: str) -> None:
+        if setting != self.setting:
+            for conn in (self.conn, self.reader):
+                for statement in SETTINGS[setting]:
+                    conn.execute(statement)
+            self.setting = setting
+
+    def search(
+        self,
+        q: np.ndarray,
+        k: int,
+        *,
+        principals: list[str] | None = None,
+        ids: list[int] | None = None,
+        setting: str = "default",
+    ) -> list[tuple[int, float]]:
+        self.configure(setting)
+        where, params = "", {"q": q, "k": k}
+        if principals is not None:
+            where, params["p"] = "WHERE principals && %(p)s", principals
+        elif ids is not None:
+            where, params["ids"] = "WHERE id = ANY(%(ids)s::integer[])", ids
+        rows = self.conn.execute(SEARCH.format(where=where), params).fetchall()
+        return [(int(i), float(s)) for i, s in rows]
+
+    def search_rls(self, q: np.ndarray, k: int, principals: list[str], setting: str = "default") -> list[tuple[int, float]]:
+        """The same search as the reader role, with the policy doing the filtering."""
+        self.configure(setting)
+        self.reader.execute("SELECT set_config('bench.principals', %s, false)", [",".join(principals)])
+        rows = self.reader.execute(SEARCH.format(where=""), {"q": q, "k": k}).fetchall()
+        return [(int(i), float(s)) for i, s in rows]
+
+    def explain(self, q: np.ndarray, k: int, *, principals: list[str] | None = None, setting: str = "default", rls: bool = False) -> dict:
+        """The executed plan with row counts and buffers, recorded beside the results."""
+        self.configure(setting)
+        conn = self.reader if rls else self.conn
+        if rls:
+            conn.execute("SELECT set_config('bench.principals', %s, false)", [",".join(principals or [])])
+        where, params = "", {"q": q, "k": k}
+        if principals is not None and not rls:
+            where, params["p"] = "WHERE principals && %(p)s", principals
+        plan = conn.execute("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + SEARCH.format(where=where), params).fetchone()
+        return plan[0][0]
+
+    def close(self) -> None:
+        for conn in (self.conn, self.reader):
+            if conn is not None:
+                conn.close()
