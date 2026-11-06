@@ -21,7 +21,7 @@ from ..workload import Workload, principals
 from . import EF_CONSTRUCTION, EF_SEARCH, M
 
 HOST, PORT = "localhost", 9200
-ADMIN = ("admin", "Bench-Admin-2026!")
+ADMIN = ("admin", "Tq7-vector-Bench-41!")
 READER_PASSWORD = "Bench-Reader-2026!"
 INDEX = "chunks"
 

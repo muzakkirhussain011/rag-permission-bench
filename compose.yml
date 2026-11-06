@@ -59,7 +59,7 @@ services:
     profiles: [opensearch]
     environment:
       discovery.type: single-node
-      OPENSEARCH_INITIAL_ADMIN_PASSWORD: "Bench-Admin-2026!"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: "Tq7-vector-Bench-41!"
       OPENSEARCH_JAVA_OPTS: "-Xms4g -Xmx4g"
     ulimits:
       nofile: {soft: 65536, hard: 65536}
