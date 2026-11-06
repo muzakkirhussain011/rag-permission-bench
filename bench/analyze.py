@@ -18,14 +18,16 @@ from pathlib import Path
 import numpy as np
 
 from .metrics import score
-from .util import read_jsonl_gz, write_json
+from .util import read_jsonl_gz, write_json, write_jsonl_gz
 from .workload import Workload
 
 
-def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], list[str]]:
+def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], list[str], list[dict]]:
     masks: dict[tuple[str, str], np.ndarray] = {}
     cells: dict[tuple[str, str], list] = defaultdict(list)
     problems: list[str] = []
+    scored: list[dict] = []
+    kinds = {layout.name: layout.params.get("kinds", {}) for layout in w.layouts}
     for row in rows:
         key = (row["layout"], row["user"])
         if key not in masks:
@@ -33,6 +35,10 @@ def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], l
         t = truth[(row["layout"], row["user"], row["q"])]
         s = score(row["hits"], t, masks[key], w.vectors, w.queries[row["q"]])
         cells[(row["arm"], row["layout"])].append((row, s))
+        scored.append({"arm": row["arm"], "layout": row["layout"], "user": row["user"], "q": row["q"],
+                       "kind": kinds[row["layout"]].get(f"{row['user']}|{row['q']}"), "ms": row["ms"],
+                       "error": row["error"], "n_readable": t["n_readable"], "sigma_g": t["sigma_g"],
+                       "rho": t["rho"], **s})
         if row["arm"] == "a0" and row["error"] is None and t["n_readable"] > 0 and s["recall"] != 1.0:
             problems.append(f"a0 recall {s['recall']} on {key} q{row['q']}")
         if row["arm"] == "a0" and s["outside"]:
@@ -60,7 +66,7 @@ def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], l
             "p50_ms": float(np.percentile(ms, 50)),
             "p99_ms": float(np.percentile(ms, 99)),
         })
-    return out, problems
+    return out, problems, scored
 
 
 def main() -> None:
@@ -71,7 +77,8 @@ def main() -> None:
     args = p.parse_args()
     w = Workload(args.workload)
     truth = {(t["layout"], t["user"], t["q"]): t for t in read_jsonl_gz(args.workload / "truth.jsonl.gz")}
-    summary, problems = summarize(w, read_jsonl_gz(args.run), truth)
+    summary, problems, scored = summarize(w, read_jsonl_gz(args.run), truth)
+    write_jsonl_gz(args.run.with_name(args.run.name.replace(".jsonl.gz", ".scored.jsonl.gz")), scored)
     write_json(args.run.with_name(args.run.name.replace(".jsonl.gz", ".summary.json")),
                {"cells": summary, "problems": problems})
     print("| arm | layout | queries | recall@10 | empty | outside | errors | p50 ms | p99 ms |")

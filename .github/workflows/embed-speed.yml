@@ -1,0 +1,20 @@
+name: embed-speed
+
+# Measures how fast the embedding variants run on a GitHub-hosted runner, to plan the corpus build.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  speed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-data.txt sentence-transformers --extra-index-url https://download.pytorch.org/whl/cpu
+      - run: python -m bench.embed_speed --n 2000
