@@ -88,8 +88,9 @@ class OpenSearch:
     def _dls_users(self, client, w: Workload) -> int:  # noqa: ANN001
         count = 0
         for layout in w.layouts:
-            for user, groups in layout.user_groups.items():
-                dls = json.dumps({"terms": {"principals": principals(user, groups)}})
+            users = sorted(set(layout.user_groups) | {u for u, _ in layout.queries})
+            for user in users:
+                dls = json.dumps({"terms": {"principals": principals(user, layout.user_groups.get(user, []))}})
                 client.transport.perform_request("PUT", f"/_plugins/_security/api/roles/r_{user}", body={
                     "index_permissions": [{"index_patterns": [INDEX], "dls": dls, "allowed_actions": ["read"]}],
                 })
@@ -125,6 +126,10 @@ class OpenSearch:
             self.readers[user] = _client((user, READER_PASSWORD))
         result = self.readers[user].search(index=INDEX, body=_body(q, k, None), request_timeout=30)
         return [(int(h["_id"]), float(h["_score"])) for h in result["hits"]["hits"]]
+
+    def set_principals(self, i: int, principals: list[str], vector: np.ndarray) -> None:
+        """An update without `refresh`: the change shows once OpenSearch refreshes (every second by default)."""
+        self.client.update(index=INDEX, id=str(i), body={"doc": {"principals": principals}})
 
     def close(self) -> None:
         for client in [self.client, *self.readers.values()]:

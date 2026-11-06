@@ -140,6 +140,7 @@ def main() -> None:
     p.add_argument("--arms", default="")
     p.add_argument("--layouts", default="")
     p.add_argument("--settle", type=float, default=10.0, help="seconds between loading and the first query")
+    p.add_argument("--partitions", action="store_true", help="also build per-principal partitions (arm A6, pgvector)")
     args = p.parse_args()
 
     meta: dict = {"args": {k: str(v) for k, v in vars(args).items()}, "environment": environment()}
@@ -147,6 +148,8 @@ def main() -> None:
     meta["workload"] = w.meta
     store = stores.make(args.store)
     meta["load"] = {"store": store.load(w), "spicedb": engines.load_spicedb(w), "openfga": engines.load_openfga(w)}
+    if args.partitions:
+        meta["load"]["partitions"] = store.load_partitions(w)
     time.sleep(args.settle)
     store.open()
     ctx = Context(w, store, fga=meta["load"]["openfga"])
@@ -163,6 +166,8 @@ def main() -> None:
         meta["plans"] = explain_samples(ctx, pairs)
     if hasattr(store, "strategy"):
         meta["filter_strategy_at_end"] = store.strategy()
+    stats = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}"], capture_output=True, text=True)
+    meta["docker_stats_after"] = [line for line in stats.stdout.splitlines() if line.strip()]
     store.close()
     write_jsonl_gz(args.out, rows)
     write_json(args.out.with_name(args.out.name.replace(".jsonl.gz", ".meta.json")), meta)

@@ -1,0 +1,63 @@
+name: prepare-enron
+
+# Builds W1 from the public CMU Enron release: readers from the mail headers, addresses replaced by
+# numbers, messages embedded on this runner's CPU, exact answers computed. No message text and no
+# address leaves the runner; only vectors, numeric ACLs and numeric layouts are kept.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: keep only the first N unique messages (0 = all)
+        default: "0"
+      publish:
+        description: publish as a release
+        type: boolean
+        default: false
+      release:
+        description: release tag when publishing
+        default: data-enron-v1
+
+permissions:
+  contents: write
+
+jobs:
+  enron:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h / && nproc && free -g
+      - run: pip install -r requirements-data.txt
+      - name: Download the CMU release (2015-05-07)
+        run: |
+          curl -L --fail --retry 3 -o enron.tar.gz https://www.cs.cmu.edu/~enron/enron_mail_20150507.tar.gz
+          ls -la enron.tar.gz && sha256sum enron.tar.gz
+      - run: python -m bench.w1_enron --tarball enron.tar.gz --out data/w1 --limit ${{ inputs.limit }}
+      - run: python -m bench.truth --workload data/w1
+      - name: Package
+        run: |
+          mkdir -p out
+          tar czf out/w1-workload.tar.gz -C data/w1 acl.npz names.json layouts.json meta.json truth.jsonl.gz w1-stats.json
+          cp data/w1/vectors.npy out/w1-vectors.npy && cp data/w1/queries.npy out/w1-queries.npy
+          cat data/w1/w1-stats.json
+          cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS && ls -la
+      - if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: enron-${{ inputs.limit }}
+          path: out/
+          retention-days: 14
+      - if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release }}" out/* \
+            --title "Data: W1 from the CMU Enron release" \
+            --notes "Built by run ${{ github.run_id }} at commit ${{ github.sha }} with bench.w1_enron and bench.truth. Addresses are numbers; no message text is included. Checksums in SHA256SUMS."

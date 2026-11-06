@@ -39,6 +39,29 @@ jobs:
           name: requirements-resolved
           path: requirements-resolved.txt
 
+  faults:
+    needs: unit
+    runs-on: ubuntu-24.04
+    env:
+      BENCH_SPICEDB_GRPC: localhost:60051
+      BENCH_SPICEDB_HTTP: http://localhost:60443
+      BENCH_OPENFGA_URL: http://localhost:60080
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt
+      - run: docker compose --profile pgvector --profile authz up -d
+      - run: python -m bench.devdata --out data/dev && python -m bench.truth --workload data/dev
+      - run: python -m bench.faults --workload data/dev --store pgvector --out results/faults-pgvector.jsonl.gz --queries 20
+      - run: python -m bench.analyze --workload data/dev --run results/faults-pgvector.jsonl.gz
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: faults-dev
+          path: results/
+
   e2e:
     needs: unit
     runs-on: ubuntu-24.04
@@ -58,8 +81,13 @@ jobs:
           docker compose --profile ${{ matrix.store }} --profile authz up -d
       - run: python -m bench.devdata --out data/dev
       - run: python -m bench.truth --workload data/dev
-      - run: python -m bench.run --workload data/dev --store ${{ matrix.store }} --out results/dev-${{ matrix.store }}.jsonl.gz
+      - run: python -m bench.run --workload data/dev --store ${{ matrix.store }} --out results/dev-${{ matrix.store }}.jsonl.gz ${{ matrix.store == 'pgvector' && '--partitions' || '' }}
       - run: python -m bench.analyze --workload data/dev --run results/dev-${{ matrix.store }}.jsonl.gz --check
+      - name: Permission changes, briefly (fresh servers)
+        run: |
+          docker compose --profile ${{ matrix.store }} --profile authz down -v
+          docker compose --profile ${{ matrix.store }} --profile authz up -d
+          python -m bench.churn --workload data/dev --store ${{ matrix.store }} --out results/churn-${{ matrix.store }}.jsonl.gz --events 4 --cap 20 --settle 3
       - if: always()
         run: mkdir -p results && docker compose --profile ${{ matrix.store }} --profile authz logs --no-color > results/compose.log 2>&1 || true
       - if: always()

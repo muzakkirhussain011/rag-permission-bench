@@ -8,6 +8,7 @@ Loading runs before any measured query and is timed separately.
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -20,10 +21,14 @@ from .util import log, retry
 from .workload import Workload
 
 CONFIG = Path(__file__).resolve().parent.parent / "config"
-SPICEDB_GRPC = "localhost:50051"
-SPICEDB_HTTP = "http://localhost:8443"
+# Arms reach the engines here; fault runs point these at a fault-injecting proxy instead (bench.faults).
+SPICEDB_GRPC = os.environ.get("BENCH_SPICEDB_GRPC", "localhost:50051")
+SPICEDB_HTTP = os.environ.get("BENCH_SPICEDB_HTTP", "http://localhost:8443")
+OPENFGA_URL = os.environ.get("BENCH_OPENFGA_URL", "http://localhost:8080")
 SPICEDB_TOKEN = "bench"
-OPENFGA_URL = "http://localhost:8080"
+# Loading and permission changes always go straight to the engines.
+SPICEDB_ADMIN = "localhost:50051"
+OPENFGA_ADMIN = "http://localhost:8080"
 BATCH = 1000
 
 
@@ -71,7 +76,7 @@ def spicedb_client():  # noqa: ANN201 - authzed's Client has no public type to i
     from authzed.api.v1 import Client
     from grpcutil import insecure_bearer_token_credentials
 
-    return Client(SPICEDB_GRPC, insecure_bearer_token_credentials(SPICEDB_TOKEN))
+    return Client(SPICEDB_ADMIN, insecure_bearer_token_credentials(SPICEDB_TOKEN))
 
 
 def _relationship(t: Tuple):  # noqa: ANN202
@@ -109,7 +114,7 @@ def load_spicedb(w: Workload) -> dict:
 def _fga(method: str, path: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(
-        OPENFGA_URL + path, data=data, method=method, headers={"Content-Type": "application/json"}
+        OPENFGA_ADMIN + path, data=data, method=method, headers={"Content-Type": "application/json"}
     )
     try:
         with urllib.request.urlopen(request, timeout=120) as response:
@@ -140,3 +145,29 @@ def load_openfga(w: Workload) -> dict:
     seconds = time.perf_counter() - started
     log(f"OpenFGA: {total} tuples in {seconds:.0f} s")
     return {"store_id": store_id, "model_id": model_id, "tuples": total, "load_s": seconds}
+
+
+# ---- permission changes (bench.churn) ------------------------------------------------------------
+
+
+def spicedb_change(client, touch: list[Tuple], delete: list[Tuple]) -> None:  # noqa: ANN001
+    """One WriteRelationships call; returns when SpiceDB has acknowledged it."""
+    from authzed.api.v1 import RelationshipUpdate, WriteRelationshipsRequest
+
+    updates = [RelationshipUpdate(operation=RelationshipUpdate.Operation.OPERATION_TOUCH, relationship=_relationship(t))
+               for t in touch]
+    updates += [RelationshipUpdate(operation=RelationshipUpdate.Operation.OPERATION_DELETE,
+                                   relationship=_relationship(t)) for t in delete]
+    if updates:
+        client.WriteRelationships(WriteRelationshipsRequest(updates=updates))
+
+
+def openfga_change(fga: dict, write: list[Tuple], delete: list[Tuple]) -> None:
+    """One Write call; returns when OpenFGA has acknowledged it. Deletes must name existing tuples."""
+    body: dict = {"authorization_model_id": fga["model_id"]}
+    if write:
+        body["writes"] = {"tuple_keys": [_fga_key(t) for t in write]}
+    if delete:
+        body["deletes"] = {"tuple_keys": [_fga_key(t) for t in delete]}
+    if write or delete:
+        _fga("POST", f"/stores/{fga['store_id']}/write", body)

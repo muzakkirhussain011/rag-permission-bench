@@ -49,6 +49,10 @@ class Qdrant:
             hnsw_config=models.HnswConfigDiff(m=M, ef_construct=EF_CONSTRUCTION),
         )
         client.create_payload_index(COLLECTION, "principals", models.PayloadSchemaType.KEYWORD, wait=True)
+        # wardowl's Qdrant backend (arm A7) reads the chunk id from `wardowl_id` and filters on `metadata.doc_id`.
+        # Every Qdrant cell carries these fields, so all arms search the same collection.
+        for field in ("wardowl_id", "metadata.doc_id"):
+            client.create_payload_index(COLLECTION, field, models.PayloadSchemaType.KEYWORD, wait=True)
         started = time.perf_counter()
         for start in range(0, w.n, UPLOAD_BATCH):
             stop = min(start + UPLOAD_BATCH, w.n)
@@ -57,7 +61,8 @@ class Qdrant:
                 points=models.Batch(
                     ids=list(range(start, stop)),
                     vectors=np.asarray(w.vectors[start:stop], dtype=np.float32).tolist(),
-                    payloads=[{"principals": w.chunk_principals(i)} for i in range(start, stop)],
+                    payloads=[{"principals": w.chunk_principals(i), "wardowl_id": f"c{i}", "page_content": "",
+                               "metadata": {"doc_id": f"c{i}"}} for i in range(start, stop)],
                 ),
                 wait=False,
             )
@@ -110,6 +115,15 @@ class Qdrant:
             with_vectors=False,
         )
         return [(int(p.id), float(p.score)) for p in response.points]
+
+    def set_principals(self, i: int, principals: list[str], vector: np.ndarray) -> None:
+        self.client.set_payload(COLLECTION, payload={"principals": principals}, points=[i], wait=True)
+
+    def wardowl_backend(self):  # noqa: ANN201
+        from qdrant_client import models
+        from wardowl.backends.qdrant import QdrantBackend
+
+        return QdrantBackend(self._client(), COLLECTION, search_params=models.SearchParams(hnsw_ef=EF_SEARCH))
 
     def close(self) -> None:
         if self.client is not None:

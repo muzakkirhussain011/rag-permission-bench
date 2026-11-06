@@ -37,12 +37,24 @@ jobs:
       - run: python -m bench.data_msmarco --out data/msmarco --n ${{ inputs.n }}
       - run: python -m bench.w3 --corpus data/msmarco --out data/w3
       - run: python -m bench.truth --workload data/w3
+      - name: W2, HoneyBee's four RBAC workloads, on the first 200,000 passages
+        run: |
+          n=$(( ${{ inputs.n }} < 200000 ? ${{ inputs.n }} : 200000 ))
+          for v in tree_a uniform_a erbac_a erbac_b; do
+            python -m bench.w2 --corpus data/msmarco --out data/w2_$v --variant $v --n $n
+            python -m bench.truth --workload data/w2_$v
+            cat data/w2_$v/w2-stats.json
+          done
       - name: Package
         run: |
           cd data
-          tar czf w3-workload.tar.gz -C w3 acl.npz names.json layouts.json meta.json truth.jsonl.gz folders.npy corpus-meta.json
-          mkdir -p out && cp msmarco/vectors.npy msmarco/queries.npy msmarco/passages.json.gz msmarco/questions.json out/
-          cp msmarco/meta.json out/corpus-meta.json && cp w3-workload.tar.gz out/
+          mkdir -p out
+          tar czf out/w3-workload.tar.gz -C w3 acl.npz names.json layouts.json meta.json truth.jsonl.gz folders.npy corpus-meta.json
+          for v in tree_a uniform_a erbac_a erbac_b; do
+            tar czf out/w2_$v-workload.tar.gz -C w2_$v acl.npz names.json layouts.json meta.json truth.jsonl.gz w2-stats.json
+          done
+          cp msmarco/vectors.npy msmarco/queries.npy msmarco/passages.json.gz msmarco/questions.json out/
+          cp msmarco/meta.json out/corpus-meta.json
           cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS && ls -la
       - if: ${{ !inputs.publish }}
         uses: actions/upload-artifact@v4

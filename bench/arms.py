@@ -18,6 +18,8 @@ post-filter wraps) and `IdFilteredStore` (a vector store whose `asimilarity_sear
 | a4@S | the store's own filter on the user's principals |
 | a5-rls@S | PostgreSQL row-level security (pgvector only) |
 | a5-dls | OpenSearch document-level security: an unfiltered search sent as the user (OpenSearch only) |
+| a6-partition | one pgvector table and index per role (W2) or per user (W1); hits from the user's tables merged |
+| a7-wardowl | wardowl's `PermissionedRetriever` with its SpiceDB authorizer (pgvector and Qdrant; the author's own) |
 
 `@S` is the store setting the filtered search runs under (see `bench/stores`).
 """
@@ -49,6 +51,9 @@ class Context:
     fga: dict = field(default_factory=dict)  # store_id, model_id from engines.load_openfga
 
     def vector(self, key: str) -> np.ndarray:
+        """`q<i>`: question i; `v<i>`: chunk i's own vector (the probes of bench.churn)."""
+        if key[0] == "v":
+            return np.asarray(self.workload.vectors[int(key[1:])], dtype=np.float32)
         return self.workload.queries[int(key[1:])]
 
 
@@ -115,6 +120,13 @@ def _store_filter(ctx: Context, setting: str) -> Run:
 def _rls(ctx: Context, setting: str) -> Run:
     async def run(user: str, groups: list[str], key: str) -> Hits:
         return ctx.store.search_rls(ctx.vector(key), K, principals(user, groups), setting=setting)
+
+    return run
+
+
+def _partitions(ctx: Context) -> Run:
+    async def run(user: str, groups: list[str], key: str) -> Hits:
+        return ctx.store.search_partitions(ctx.vector(key), K, principals(user, groups))
 
     return run
 
@@ -203,6 +215,23 @@ def _spicedb_pre(ctx: Context, setting: str) -> Run:
     return run
 
 
+def _wardowl(ctx: Context) -> Run:
+    from wardowl import PermissionedRetriever, Query, Subject
+    from wardowl.authorizers.spicedb import SpiceDBAuthorizer
+
+    from .engines import SPICEDB_HTTP
+
+    authorizer = SpiceDBAuthorizer(SPICEDB_HTTP, SPICEDB_TOKEN, permissions={"read": "view"}, resource_type="chunk",
+                                   subject_type="user", resource_field="doc_id")
+    retriever = PermissionedRetriever(ctx.store.wardowl_backend(), authorizer)
+
+    async def run(user: str, groups: list[str], key: str) -> Hits:
+        result = retriever.retrieve(Query(vector=ctx.vector(key).tolist()), Subject(user), k=K)
+        return [(int(h.id[1:]), float(h.score)) for h in result.hits]
+
+    return run
+
+
 def names(store: Any) -> list[str]:
     """Every arm that can run on this store, in a fixed order (the run shuffles them)."""
     arms = ["a1-fga", "a1-spicedb"] + [f"a2-{e}-x{m}" for e in ("fga", "spicedb") for m in (3, 10)]
@@ -211,6 +240,10 @@ def names(store: Any) -> list[str]:
         arms = ["a0"] + arms + [f"a5-rls@{s}" for s in store.settings]
     if store.name == "opensearch":
         arms += ["a5-dls"]
+    if getattr(store, "partitions", None):
+        arms += ["a6-partition"]
+    if hasattr(store, "wardowl_backend"):
+        arms += ["a7-wardowl"]
     return arms
 
 
@@ -224,6 +257,10 @@ def build(name: str, ctx: Context) -> Run:
         return _rls(ctx, setting)
     if arm == "a5-dls":
         return _dls(ctx)
+    if arm == "a7-wardowl":
+        return _wardowl(ctx)
+    if arm == "a6-partition":
+        return _partitions(ctx)
     if arm == "a3-spicedb":
         return _spicedb_pre(ctx, setting)
     if arm in ("a1-fga", "a1-spicedb") or arm.startswith("a2-"):

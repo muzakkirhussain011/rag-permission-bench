@@ -98,6 +98,11 @@ class Milvus:
         )
         return [(int(hit["id"]), float(hit["distance"])) for hit in result[0]]
 
+    def set_principals(self, i: int, principals: list[str], vector: np.ndarray) -> None:
+        """Milvus updates whole rows: an upsert with the same vector and new principals."""
+        self.client.upsert(COLLECTION, [{"id": i, "principals": principals,
+                                         "embedding": np.asarray(vector, dtype=np.float32).tolist()}])
+
     def close(self) -> None:
         if self.client is not None:
             self.client.close()

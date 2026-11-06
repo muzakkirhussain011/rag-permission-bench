@@ -1,0 +1,104 @@
+name: cell
+
+# One cell on real data: fetch a published workload, check its checksums, start one store and both
+# engines, and run every arm (`run`) or the permission-change probes (`churn`). `label` is `pilot`
+# for harness checks (never reported) or `measured` (only after the pre-registration is deposited).
+
+on:
+  workflow_dispatch:
+    inputs:
+      workload:
+        description: w3, w1, w2_tree_a, w2_uniform_a, w2_erbac_a or w2_erbac_b
+        default: w3
+      store:
+        description: pgvector, qdrant, milvus, weaviate or opensearch
+        default: pgvector
+      kind:
+        description: run or churn
+        default: run
+      layouts:
+        description: comma-separated layout names (empty = all)
+        default: ""
+      seed:
+        default: "1"
+      label:
+        description: pilot or measured
+        default: pilot
+
+permissions:
+  contents: read
+
+jobs:
+  cell:
+    name: ${{ inputs.label }} ${{ inputs.kind }} ${{ inputs.workload }} ${{ inputs.store }} seed ${{ inputs.seed }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h / && nproc && free -g
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt
+      - name: Fetch and check the workload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          W: ${{ inputs.workload }}
+        run: |
+          mkdir -p data/$W && cd data
+          if [ "$W" = w1 ]; then
+            gh release download data-enron-v1 -p 'w1-*' -p SHA256SUMS
+            sha256sum -c SHA256SUMS
+            mv w1-vectors.npy $W/vectors.npy && mv w1-queries.npy $W/queries.npy
+          else
+            gh release download data-msmarco-v1 -p vectors.npy -p queries.npy -p "$W-workload.tar.gz" -p SHA256SUMS
+            sha256sum -c SHA256SUMS --ignore-missing
+            mv vectors.npy queries.npy $W/
+          fi
+          tar xzf $W-workload.tar.gz -C $W
+          cd .. && python - <<'EOF'
+          import json, os, numpy as np
+          from pathlib import Path
+          from bench.util import sha256
+          root = Path("data") / os.environ["W"]
+          meta = json.loads((root / "meta.json").read_text())
+          vectors = np.load(root / "vectors.npy", mmap_mode="r")
+          if len(vectors) > meta["n_chunks"]:  # W2 uses the first n passages of the corpus
+              np.save(root / "vectors.npy", np.ascontiguousarray(vectors[: meta["n_chunks"]]))
+          bad = [f for f, digest in meta["sha256"].items() if sha256(root / f) != digest]
+          assert not bad, f"checksum mismatch: {bad}"
+          print("workload", meta["name"], meta["n_chunks"], "chunks: checksums match")
+          EOF
+      - name: Start the store and both engines
+        run: |
+          sudo sysctl -w vm.max_map_count=262144
+          docker compose --profile ${{ inputs.store }} --profile authz up -d
+      - name: Run
+        env:
+          W: ${{ inputs.workload }}
+          OUT: results/${{ inputs.label }}-${{ inputs.kind }}-${{ inputs.workload }}-${{ inputs.store }}-seed${{ inputs.seed }}
+        run: |
+          mkdir -p results
+          partitions=""
+          case "$W" in w1|w2_*) [ "${{ inputs.store }}" = pgvector ] && partitions="--partitions" ;; esac
+          if [ "${{ inputs.kind }}" = churn ]; then
+            python -m bench.churn --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }}
+          else
+            python -m bench.run --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz \
+              --seed ${{ inputs.seed }} --layouts "${{ inputs.layouts }}" $partitions
+            python -m bench.analyze --workload data/$W --run $OUT.jsonl.gz
+          fi
+      - if: always()
+        run: |
+          mkdir -p results
+          docker compose --profile ${{ inputs.store }} --profile authz images > results/images.txt 2>&1 || true
+          docker compose --profile ${{ inputs.store }} --profile authz logs --no-color --tail 2000 > results/compose.log 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.label }}-${{ inputs.kind }}-${{ inputs.workload }}-${{ inputs.store }}-seed${{ inputs.seed }}
+          path: results/
+          retention-days: 90

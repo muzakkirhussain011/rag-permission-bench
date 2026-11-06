@@ -16,7 +16,7 @@ import time
 import numpy as np
 
 from ..util import log, retry
-from ..workload import Workload
+from ..workload import Workload, principals
 from . import EF_CONSTRUCTION, EF_SEARCH, M
 
 DSN = "postgresql://postgres:bench@localhost:5432/bench"
@@ -49,6 +49,7 @@ class PgVector:
         self.conn = None
         self.reader = None
         self.setting = None
+        self.partitions: dict[str, str] = {}
 
     def load(self, w: Workload) -> dict:
         import psycopg
@@ -77,6 +78,17 @@ class PgVector:
         )
         indexed = time.perf_counter()
         conn.execute("CREATE INDEX chunks_principals ON chunks USING gin (principals)")
+        # wardowl's pgvector backend (arm A7) expects (id, content, metadata, embedding) and orders by cosine
+        # distance. A view gives it that layout over the same rows; a cosine HNSW index serves its order
+        # (on unit vectors, cosine and inner product rank alike). Other arms never touch either.
+        conn.execute(
+            "CREATE OR REPLACE VIEW wardowl_chunks AS SELECT 'c' || id AS id, ''::text AS content,"
+            " jsonb_build_object('doc_id', 'c' || id) AS metadata, embedding FROM chunks"
+        )
+        conn.execute(
+            f"CREATE INDEX chunks_hnsw_cosine ON chunks USING hnsw (embedding vector_cosine_ops)"
+            f" WITH (m = {M}, ef_construction = {EF_CONSTRUCTION})"
+        )
         conn.execute("ANALYZE chunks")
         conn.execute(
             "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'bench_reader') THEN"
@@ -149,6 +161,63 @@ class PgVector:
             where, params["p"] = "WHERE principals && %(p)s", principals
         plan = conn.execute("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + SEARCH.format(where=where), params).fetchone()
         return plan[0][0]
+
+    def load_partitions(self, w: Workload) -> dict:
+        """Arm A6: one table and HNSW index per principal held by a measured user (a role in W2, a
+        user's own mail in W1). A user's search runs on each of their partitions and merges the hits."""
+        held = sorted({p for layout in w.layouts for u in {*layout.user_groups, *(x for x, _ in layout.queries)}
+                       for p in principals(u, layout.user_groups.get(u, []))})
+        started = time.perf_counter()
+        rows = 0
+        self.partitions = {}
+        with _connect(DSN) as conn:
+            conn.execute("SET maintenance_work_mem = '2GB'")
+            for n, p in enumerate(held):
+                table = f"part_{n}"
+                conn.execute(f"DROP TABLE IF EXISTS {table}")
+                conn.execute(f"CREATE TABLE {table} AS SELECT id, embedding FROM chunks WHERE principals @> ARRAY[%s]::text[]",
+                             [p])
+                count = conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                if count == 0:
+                    conn.execute(f"DROP TABLE {table}")
+                    continue
+                conn.execute(f"CREATE INDEX ON {table} USING hnsw (embedding vector_ip_ops)"
+                             f" WITH (m = {M}, ef_construction = {EF_CONSTRUCTION})")
+                self.partitions[p] = table
+                rows += count
+            size = sum(conn.execute("SELECT pg_total_relation_size(%s)", [t]).fetchone()[0]
+                       for t in self.partitions.values())
+        log(f"pgvector: {len(self.partitions)} partitions, {rows} rows, in {time.perf_counter() - started:.0f} s")
+        return {"partitions": len(self.partitions), "rows": rows, "bytes": size, "copies": rows / w.n,
+                "build_s": time.perf_counter() - started}
+
+    def search_partitions(self, q: np.ndarray, k: int, principals_: list[str]) -> list[tuple[int, float]]:
+        self.configure("default")  # the partitions hold only readable rows: no filter, plain index scans
+        best: dict[int, float] = {}
+        for p in principals_:
+            table = self.partitions.get(p)
+            if table is None:
+                continue
+            for i, s in self.conn.execute(SEARCH.format(where="").replace("chunks", table), {"q": q, "k": k}).fetchall():
+                best[int(i)] = max(best.get(int(i), -1e9), float(s))
+        return sorted(best.items(), key=lambda x: (-x[1], x[0]))[:k]
+
+    def set_principals(self, i: int, principals_: list[str], vector: np.ndarray) -> None:
+        """Permission change for one chunk, as a sync job would apply it (partitions included)."""
+        self.conn.execute("UPDATE chunks SET principals = %s WHERE id = %s", [principals_, i])
+        for p, table in self.partitions.items():
+            if p in principals_:
+                self.conn.execute(f"INSERT INTO {table} SELECT id, embedding FROM chunks WHERE id = %(i)s"
+                                  f" AND NOT EXISTS (SELECT 1 FROM {table} WHERE id = %(i)s)", {"i": i})
+            else:
+                self.conn.execute(f"DELETE FROM {table} WHERE id = %s", [i])
+
+    def wardowl_backend(self):  # noqa: ANN201
+        from psycopg_pool import ConnectionPool
+        from wardowl.backends.pgvector import PgVectorBackend
+
+        pool = ConnectionPool(DSN, min_size=1, max_size=2, kwargs={"autocommit": True}, open=True)
+        return PgVectorBackend(pool, table="wardowl_chunks", iterative_scan="relaxed_order", ef_search=EF_SEARCH)
 
     def close(self) -> None:
         for conn in (self.conn, self.reader):

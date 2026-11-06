@@ -98,6 +98,12 @@ services:
     depends_on:
       spicedb-migrate: {condition: service_completed_successfully}
 
+  # Fault runs (bench.faults) send the arms' engine traffic through this proxy; other runs never touch it.
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    profiles: [authz]
+    ports: ["8474:8474", "60051:60051", "60443:60443", "60080:60080"]
+
   openfga-migrate:
     image: openfga/openfga:v1.22.1
     profiles: [authz]

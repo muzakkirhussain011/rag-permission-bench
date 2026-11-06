@@ -12,6 +12,11 @@ Changes after deposit go in a dated amendments section at the end, never in plac
   Retrieval for RAG across Vector Stores and Authorization Engines", archive 10.5281/zenodo.23874614), which used other
   data and measured only wardowl, plus one row-level-security side run. wardowl is the author's own library: a declared
   conflict of interest.
+- Seen while testing the harness, before deposit: the CI runs on a small synthetic workload (random vectors, 3,000
+  chunks; `bench.devdata`), whose numbers check the harness and say nothing about any arm. One observation is
+  disclosed because it shapes an arm: auth0-ai-langchain 1.0.1's `FGARetriever.ainvoke` raised
+  `TypeError: unhashable type: 'Document'` on every store (langchain-core 0.3.86, the newest its package allows).
+  Arm A1-FGA therefore uses `invoke`, as Auth0's README does, and the async failure is reported as a finding.
 
 ## 2. Questions
 
@@ -30,7 +35,7 @@ Changes after deposit go in a dated amendments section at the end, never in plac
 | A3 | Engine pre-filter | langchain-spicedb 0.2.0 `SpiceDBPreFilterRetriever`, under each store setting |
 | A4 | Reader groups on chunks | each store's filtered search at its default and at its documented alternative setting |
 | A5 | Database-native | PostgreSQL row-level security with pgvector; OpenSearch document-level security |
-| A6 | Partitioning | one collection per role; HoneyBee if licensed |
+| A6 | Partitioning | one pgvector table and HNSW index per role (W2) or per user (W1), searched and merged; HoneyBee if its authors license the code |
 | A7 | wardowl | one commit, pinned before deposit, on pgvector and Qdrant |
 
 Stores: pgvector, Qdrant, Milvus, Weaviate, OpenSearch; exact versions in `compose.yml` and the lock file, image
@@ -41,21 +46,27 @@ store underneath them. k = 10 throughout.
 
 ## 4. Workloads
 
-- **W1 Enron**, CMU release 2015-05-07. Messages deduplicated by Message-ID, then by a hash of the body. One chunk per
+- **W1 Enron**, CMU release 2015-05-07. Messages deduplicated by Message-ID, then by a hash of subject and body
+  (readers merged). One chunk per
   message: subject plus body, cut at the embedding model's limit. Readers: the addresses in From, To, Cc and Bcc.
   Users: the addresses that can read at least 50 messages; 200 sampled, stratified by readable count (seed fixed).
   Queries: per user, 10 subjects of messages that user can read ("own mail") and 10 subjects of messages they cannot
   ("other mail"); subjects of fewer than three words are skipped. Addresses are replaced by numbers before any output.
-- **W2 RBAC generators**: Tree, Uniform and ERBAC with HoneyBee's published parameters (its section 6.2), 1,000 users,
-  100 roles, over 1M MS MARCO passages (BEIR, first 1,000,000) and 300 MS MARCO questions. One extra cell repeats
-  HoneyBee's own Wikipedia setting for comparison with its paper.
+- **W2 RBAC generators**: Tree-α, Uniform-α, ERBAC-α and ERBAC-β with HoneyBee's published parameters (its section
+  6.2), 1,000 users, 100 roles, re-implemented from the paper's text (its code has no license; choices where the text
+  is silent are stated in `bench/w2.py`), over the first 200,000 MS MARCO passages, so that per-role partitions (arm
+  A6) fit a runner. 100 users drawn at random, 10 questions each. The achieved readable shares are reported beside
+  HoneyBee's Table 1; no claim of an exact replication is made.
 - **W3 sweep**: the W2 corpus and questions. Readable share s in {0.001, 0.01, 0.05, 0.2, 0.5}; correlation in
   {negative, none, positive}. The corpus is split into k-means clusters (k = 1,000), each a folder that a user is
   granted whole. Positive grants the folders nearest the user's questions, none grants folders in random order,
   negative grants the farthest, each until the share is reached. The achieved share and correlation (Amanbayev et
   al.'s rho_q) are measured per query and reported; cells are labeled by what was achieved.
-- **Churn**: on each workload, grants and revocations at 1 and 10 per second for 10 minutes; for each change a probe
-  query whose exact top hit is the changed chunk, repeated every 100 ms until the answer reflects the change, capped at 60 s.
+- **Churn** (`bench.churn`, fresh servers): per cell and arm, 20 changes one at a time, alternating a revocation (a
+  chunk a measured user may read loses every reader) and a grant (a chunk nobody may read, left to settle 10 s, gains
+  the user as a reader). Each change is applied in parallel at both engines and the store's copy of the chunk's
+  principals, as a sync job would. The probe is the chunk's own vector, asked every 100 ms until the answer reflects
+  the change, capped at 60 s.
 - Embeddings: BAAI/bge-small-en-v1.5 through fastembed's ONNX build on CPU, normalized, computed once in GitHub
   Actions; the model file's and every output file's SHA-256 are published.
 
@@ -66,13 +77,16 @@ store underneath them. k = 10 throughout.
 - **Empty answer**: zero hits for a user who can read at least 10 chunks.
 - **Outside**: any returned chunk not in the user's readable set at query time. Counted in every run, not only fault runs.
 - **Latency**: wall time from the call into the arm to its return, embedding excluded; p50 and p99 per job.
-- **Throughput**: answers per second with 1 and 4 client threads.
-- **Memory and storage**: store-reported index and data size; container peak memory.
+- **Throughput**: not measured with concurrent clients; every arm answers one query at a time from one client.
+- **Memory and storage**: store-reported index and data size where the store reports it; container memory after the
+  measured pass (`docker stats`).
 - **Build time**: load and index time to queryable.
-- **Change delay**: time from the source acknowledging a change to the first probe that reflects it; probes still
-  wrong at 60 s are reported as censored.
-- **Faults**: engine stopped; engine delayed 2 s; LookupResources stream cut after half its IDs; an ID list above a
-  store's documented or observed request limit; a cache older than its TTL. For each: outside, empty, error counts.
+- **Change delay**: time from the last source acknowledging a change to the first probe that reflects it; each
+  source's write latency is recorded too; probes still wrong at 60 s are reported as censored.
+- **Faults** (`bench.faults`): the arms that ask an engine at query time answer 100 pairs through a proxy (Toxiproxy)
+  under each of: no fault; engine connections refused; 2 s added to every engine response; engine connections closed
+  after 16 KiB, which ends long LookupResources streams part-way. ID lists above a store's limits are observed in the
+  main runs (A3 at large shares), not injected. For each: outside, empty and error counts.
 
 ## 6. Procedure
 

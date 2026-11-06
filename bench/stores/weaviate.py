@@ -122,6 +122,9 @@ class Weaviate:
         )
         return [(int(o.properties["cid"]), -float(o.metadata.distance)) for o in result.objects]
 
+    def set_principals(self, i: int, principals: list[str], vector: np.ndarray) -> None:
+        self.collection.data.update(uuid=_uuid(i), properties={"principals": principals})
+
     def strategy(self) -> str:
         return str(self.collection.config.get().vector_index_config.filter_strategy)
 
