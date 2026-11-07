@@ -51,8 +51,9 @@ place.
     fault) printed error counts per arm and fault, not outside counts; the change pilot printed change delays, an
     exploratory measure. The per-share W3 jobs it implies take at most about 4.5 hours.
 - An independent review of the analysis code against this document, before deposit, found that failed queries were
-  dropped from recall and that H4's 30 s rule was not applied; the code and this text were corrected (sections 5
-  to 8), and the report's rules are covered by tests (`tests/test_report.py`).
+  dropped from recall and that H4's 30 s rule was not applied, and that W1 could give a user the same question twice
+  or under both kinds; the code and this text were corrected (sections 4 to 8), W1 was rebuilt (`data-enron-v2`),
+  and the report's rules are covered by tests (`tests/test_report.py`).
 
 ## 2. Questions
 
@@ -107,6 +108,8 @@ integrations run as installed from PyPI; the harness only supplies the store und
   the change, capped at 60 s.
 - Embeddings: BAAI/bge-small-en-v1.5 through fastembed's ONNX build on CPU, normalized, computed once in GitHub
   Actions; the model file's and every output file's SHA-256 are published.
+- Data: releases `data-msmarco-v1` (W2, W3) and `data-enron-v2` (W1) of this repository; every measured job checks
+  their SHA-256 sums before it runs.
 
 ## 5. Measures
 
