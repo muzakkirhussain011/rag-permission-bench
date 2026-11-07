@@ -52,5 +52,6 @@ not override:
 - `data-msmarco-v1` (W2, W3) is derived from MS MARCO (Bajaj et al., 2016) through BEIR's copy: passage vectors and
   ids (no passage text), and the ids, text and vectors of 300 dev questions. MS MARCO is for non-commercial research
   purposes only; its terms (https://microsoft.github.io/msmarco/) apply, and uses should cite it.
-- `data-enron-v1` (W1) is derived from the CMU release of the Enron email corpus (2015-05-07): message vectors,
-  numeric readers and workloads, with no message text, subject or address.
+- `data-enron-v2` (W1) is derived from the CMU release of the Enron email corpus (2015-05-07): message vectors,
+  numeric readers and workloads, with no message text, subject or address. It replaces `data-enron-v1`, whose
+  questions could repeat a subject for one user (pre-registration, section 1); the measured runs use v2 only.
