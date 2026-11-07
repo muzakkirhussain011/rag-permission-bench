@@ -1,0 +1,72 @@
+name: measure
+
+# Every measured job of the pre-registered study (doi:10.5281/zenodo.24026269, section 6), at most eight at
+# a time: W3 one job per readable share, W2 and W1 one job per workload, change runs and fault runs on W3;
+# five stores; seeds 1 to 3. Seed 1 of everything runs first, then seed 2, then seed 3. A job that does
+# not finish is re-run with the same seed ("Re-run failed jobs"); report.yml uses the newest attempt.
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: comma-separated seeds
+        default: "1,2,3"
+      only:
+        description: optional filter, e.g. "w1" or "faults" (empty = everything)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          SEEDS: ${{ inputs.seeds }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          stores = ["pgvector", "qdrant", "milvus", "weaviate", "opensearch"]
+          shares = ["0p5", "0p2", "0p05", "0p01", "0p001"]  # longest first
+          cells = []
+          for seed in [s.strip() for s in os.environ["SEEDS"].split(",") if s.strip()]:
+              for share in shares:
+                  for store in stores:
+                      layouts = ",".join(f"w3_s{share}_{c}" for c in ("neg", "none", "pos"))
+                      cells.append({"workload": "w3", "store": store, "kind": "run", "layouts": layouts,
+                                    "seed": seed, "part": f"s{share}"})
+              for w in ("w2_erbac_b", "w2_erbac_a", "w2_uniform_a", "w2_tree_a", "w1"):
+                  for store in stores:
+                      cells.append({"workload": w, "store": store, "kind": "run", "layouts": "", "seed": seed, "part": ""})
+              for kind in ("faults", "churn"):
+                  for store in stores:
+                      cells.append({"workload": "w3", "store": store, "kind": kind, "layouts": "", "seed": seed, "part": ""})
+          only = os.environ["ONLY"].strip()
+          if only:
+              cells = [c for c in cells if only in (c["workload"], c["kind"], c["store"], c["part"])]
+          print(len(cells), "jobs")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("matrix=" + json.dumps({"include": cells}) + "\n")
+          EOF
+
+  cell:
+    needs: plan
+    name: ${{ matrix.kind }} ${{ matrix.workload }} ${{ matrix.part }} ${{ matrix.store }} seed ${{ matrix.seed }}
+    strategy:
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      max-parallel: 8
+      fail-fast: false
+    uses: ./.github/workflows/cell.yml
+    with:
+      workload: ${{ matrix.workload }}
+      store: ${{ matrix.store }}
+      kind: ${{ matrix.kind }}
+      layouts: ${{ matrix.layouts }}
+      seed: ${{ matrix.seed }}
+      pairs: "0"
+      label: measured

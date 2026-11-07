@@ -1,9 +1,10 @@
 # rag-permission-bench
 
 An experimental comparison of how retrieval-augmented generation (RAG) systems enforce document
-permissions in vector search. **Work in progress:** the harness is being built and no measured
-results exist yet. The plan of the study, written before any measured run, is in
-[`prereg/PREREGISTRATION.md`](prereg/PREREGISTRATION.md).
+permissions in vector search. **Work in progress:** the measured runs are under way. The plan of the
+study, deposited before any measured run, is [`prereg/PREREGISTRATION.md`](prereg/PREREGISTRATION.md),
+archived with the harness as release `prereg-v1`:
+[doi:10.5281/zenodo.24026269](https://doi.org/10.5281/zenodo.24026269).
 
 ## What is compared
 

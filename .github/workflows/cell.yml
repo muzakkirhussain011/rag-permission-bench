@@ -27,6 +27,16 @@ on:
       label:
         description: pilot or measured
         default: pilot
+  # measure.yml calls this for every measured cell, at most eight at a time.
+  workflow_call:
+    inputs:
+      workload: {type: string, required: true}
+      store: {type: string, required: true}
+      kind: {type: string, default: run}
+      layouts: {type: string, default: ""}
+      seed: {type: string, required: true}
+      pairs: {type: string, default: "0"}
+      label: {type: string, default: measured}
 
 permissions:
   contents: read
