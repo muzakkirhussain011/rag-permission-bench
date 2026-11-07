@@ -119,7 +119,8 @@ def arm_pairs(name: str, pairs: list[tuple], seed: int) -> list[tuple]:
     return out
 
 
-async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int, warmup: int) -> list[dict]:
+async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int, warmup: int,
+                  checkpoint=None) -> list[dict]:  # noqa: ANN001
     rng = random.Random(seed)
     order = list(names)
     rng.shuffle(order)
@@ -127,6 +128,8 @@ async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int,
     for name in order:
         run = arms.build(name, ctx)
         own = arm_pairs(name, pairs, seed)
+        if hasattr(run, "prepare"):  # per-user retrievers are built before any query is timed
+            run.prepare(sorted({user for _, user, _ in own}))
         for layout, user, q in rng.sample(own, min(warmup, len(own))):
             try:
                 await run(user, layout.user_groups.get(user, []), f"q{q}")
@@ -151,6 +154,8 @@ async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int,
                 "ms": (t1 - t0) / 1e6, "error": error,
             })
         log(f"{name}: {len(sequence)} queries in {time.perf_counter() - started:.0f} s, {errors} errors")
+        if checkpoint is not None:  # a job stopped by its time limit keeps every finished arm
+            checkpoint(rows)
     return rows
 
 
@@ -213,7 +218,12 @@ def main() -> None:
     layout, user, q = pairs[0]
     meta["probes"] = {"fga_ainvoke": asyncio.run(probe_fga_async(ctx, user, f"q{q}"))}
     log(f"probes: {meta['probes']}")
-    rows = asyncio.run(measure(ctx, names, pairs, args.seed, args.warmup))
+    meta_path = args.out.with_name(args.out.name.replace(".jsonl.gz", ".meta.json"))
+    meta["complete"] = False
+    write_json(meta_path, meta)
+    rows = asyncio.run(measure(ctx, names, pairs, args.seed, args.warmup,
+                               checkpoint=lambda done: write_jsonl_gz(args.out, done)))
+    meta["complete"] = True
     if store.name == "pgvector":
         meta["plans"] = explain_samples(ctx, pairs)
     if hasattr(store, "strategy"):
@@ -222,7 +232,7 @@ def main() -> None:
     meta["docker_stats_after"] = [line for line in stats.stdout.splitlines() if line.strip()]
     store.close()
     write_jsonl_gz(args.out, rows)
-    write_json(args.out.with_name(args.out.name.replace(".jsonl.gz", ".meta.json")), meta)
+    write_json(meta_path, meta)
     log(f"wrote {len(rows)} rows to {args.out}")
 
 

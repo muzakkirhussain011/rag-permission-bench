@@ -53,7 +53,7 @@ jobs:
         run: |
           mkdir -p data/$W && cd data
           if [ "$W" = w1 ]; then
-            gh release download data-enron-v1 -p 'w1-*' -p SHA256SUMS
+            gh release download data-enron-v2 -p 'w1-*' -p SHA256SUMS
             sha256sum -c SHA256SUMS
             mv w1-vectors.npy $W/vectors.npy && mv w1-queries.npy $W/queries.npy
           else

@@ -150,13 +150,25 @@ def main() -> None:
     query_texts: dict[str, int] = {}
     pairs, kinds = [], {}
     for u in chosen:
-        own = [i for i in rng.permutation(readable[u]) if usable(int(i))][: args.per_kind]
+        # Each question text appears once per user, and an "other mail" question never has the subject of a
+        # message the user may read, so every (user, question) pair has exactly one kind.
         mine = set(readable[u])
+        my_texts = {t for t in (usable(int(i)) for i in readable[u]) if t}
+        own, used = [], set()
+        for i in rng.permutation(readable[u]):
+            text = usable(int(i))
+            if text and text not in used:
+                own.append(int(i))
+                used.add(text)
+                if len(own) == args.per_kind:
+                    break
         other: list[int] = []
         while len(other) < args.per_kind:
             i = int(rng.integers(len(texts)))
-            if i not in mine and usable(i):
+            text = usable(i)
+            if i not in mine and text and text not in my_texts and text not in used:
                 other.append(i)
+                used.add(text)
         for kind, msgs in (("own", own), ("other", other)):
             for i in msgs:
                 text = usable(int(i))

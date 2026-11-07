@@ -13,7 +13,7 @@ import numpy as np
 
 from ..util import log, retry
 from ..workload import Workload
-from . import EF_CONSTRUCTION, EF_SEARCH, M
+from . import CALL_LIMIT_S, EF_CONSTRUCTION, EF_SEARCH, M
 
 URL = "http://localhost:6333"
 COLLECTION = "chunks"
@@ -30,7 +30,7 @@ class Qdrant:
     def _client(self):  # noqa: ANN202
         from qdrant_client import QdrantClient
 
-        return QdrantClient(url=URL, prefer_grpc=True, timeout=300)
+        return QdrantClient(url=URL, prefer_grpc=True, timeout=CALL_LIMIT_S)
 
     def load(self, w: Workload) -> dict:
         from qdrant_client import models

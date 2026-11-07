@@ -27,7 +27,9 @@ DENSE_LIMIT = 2_500_000_000  # bytes: below this, all chunk-query scores are com
 def top_k(scores: np.ndarray, ids: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     """The k best (score descending, id ascending) of parallel arrays."""
     if len(scores) > 4 * k:
-        keep = np.argpartition(-scores, 2 * k)[: 2 * k]
+        # Keep every score tied with the k-th best, so the id tie-break below sees all of them.
+        kth = -np.partition(-scores, k - 1)[k - 1]
+        keep = scores >= kth
         scores, ids = scores[keep], ids[keep]
     order = np.lexsort((ids, -scores))[:k]
     return ids[order], scores[order]

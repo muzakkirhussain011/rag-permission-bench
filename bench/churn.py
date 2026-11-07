@@ -110,7 +110,9 @@ async def measure(ctx: Context, sources: Sources, names: list[str], events: int,
             groups = layout.user_groups.get(user, [])
             readable = np.flatnonzero(ctx.workload.readable(user, groups))
             candidates = [int(i) for i in readable if int(i) not in used]
-            if not candidates:
+            if not candidates:  # recorded, so a skipped event is counted rather than lost
+                rows.append({"arm": name, "event": e, "kind": "revoke" if e % 2 == 0 else "grant",
+                             "layout": layout.name, "user": user, "skipped": "no chunk left to change"})
                 continue
             chunk = rng.choice(candidates)
             used.add(chunk)

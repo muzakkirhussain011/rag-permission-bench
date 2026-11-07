@@ -78,7 +78,8 @@ integrations run as installed from PyPI; the harness only supplies the store und
   message: subject plus body, cut at the embedding model's limit. Readers: the addresses in From, To, Cc and Bcc.
   Users: the addresses that can read at least 50 messages; 200 sampled, stratified by readable count (seed fixed).
   Queries: per user, 10 subjects of messages that user can read ("own mail") and 10 subjects of messages they cannot
-  ("other mail"); subjects of fewer than three words are skipped. Addresses are replaced by numbers before any output.
+  ("other mail"); subjects of fewer than three words are skipped, a subject is used once per user, and an other-mail
+  subject is never the subject of a message the user may read. Addresses are replaced by numbers before any output.
 - **W2 RBAC generators**: Tree-α, Uniform-α, ERBAC-α and ERBAC-β with HoneyBee's published parameters (its section
   6.2), 1,000 users, 100 roles, re-implemented from the paper's text (its code has no license; choices where the text
   is silent are stated in `bench/w2.py`), over the first 200,000 MS MARCO passages, so that per-role partitions (arm
@@ -99,14 +100,20 @@ integrations run as installed from PyPI; the harness only supplies the store und
 
 ## 5. Measures
 
-- **Recall@10**: |returned ∩ exact readable top 10| / min(10, readable count). Exact top 10: brute force over the
-  user's readable chunks, inner product on normalized vectors, ties broken by chunk id; computed once and stored.
-- **Empty answer**: zero hits for a user who can read at least 10 chunks.
-- **Outside**: any returned chunk not in the user's readable set at query time. Counted in every run, not only fault runs.
-- **Latency**: wall time from the call into the arm to its return, embedding excluded; p50 and p99 per job.
-- **Timeout** (H4): calls are not cut off by the harness. For H4 a call that takes longer than 30 s counts as a
-  failure; every other measure uses what the call returned. OpenSearch's client gives up on a search after 30 s,
-  which is an error.
+- **Recall@10**: the returned chunks (first 10, duplicates removed) that the user may read and whose exact score
+  reaches the tenth exact score, minus 1e-5 so that ties and the stores' floating-point differences count, divided by
+  min(10, readable count). Exact answers: brute force over the user's readable chunks, inner product on normalized
+  vectors, ties broken by chunk id; computed once and stored. A query that raised an error returned nothing: its
+  recall is 0 (counted, not dropped). A query for a user who can read nothing has no recall.
+- **Empty answer**: zero hits, without an error, for a user who can read at least 10 chunks. Errors are counted apart.
+- **Outside**: any returned chunk not in the user's readable set at query time. Counted in every query run and fault
+  run; change runs record delays only.
+- **Latency**: wall time from the call into the arm to its return, embedding excluded; p50 and p99 per job, reported
+  as the median and the range over the jobs. Per-user retriever objects are created before timing starts.
+- **Call limit and timeout** (H4): every store's client may wait up to 600 s for one call (`CALL_LIMIT_S`); a
+  longer call is an error. In fault runs a call that has not returned after 60 s is stopped and counted as an error.
+  For H4 a call that raised an error or took longer than 30 s counts as failed; every other measure uses what the
+  call returned.
 - **Throughput**: not measured with concurrent clients; every arm answers one query at a time from one client.
 - **Memory and storage**: store-reported index and data size where the store reports it; container memory after the
   measured pass (`docker stats`).
@@ -122,9 +129,11 @@ integrations run as installed from PyPI; the harness only supplies the store und
 
 - Every measured run is a GitHub Actions job on a GitHub-hosted runner from the public repository's docker compose
   files (`cell.yml`, label `measured`); a job may run at most 6 hours.
-- A cell is (workload, store, setting). Every arm that can run on a cell runs in the same job, in an order drawn from a
-  seed logged with the job; ten warm-up queries per arm, drawn from its own pairs, are discarded.
-- Five seeds per cell (1 to 5), each on its own runner. A W1 or W2 job runs the whole workload on one store; a W3 job
+- A cell is (workload, store). Every arm, at each of the store's settings, runs in the same job, in an order drawn from
+  a seed logged with the job; ten warm-up queries per arm, drawn from its own pairs, are discarded. The hypotheses'
+  cells (section 7) are slices of these: one arm and setting on one layout.
+- Three seeds per cell (1 to 3), each on its own runner; at most eight measured jobs run at a time, to keep the load on
+  GitHub's shared runners modest. A W1 or W2 job runs the whole workload on one store; a W3 job
   runs one readable share (its three correlation layouts) on one store, because a whole W3 seed takes longer than a
   job may run. Comparisons between arms are made within a job.
 - Every arm answers every pair, except two. A0, a harness check, answers one question per user. A3 answers, in W3,
@@ -132,7 +141,13 @@ integrations run as installed from PyPI; the harness only supplies the store und
   100 users at 0.5 (its pilot medians at 0.5 were 15 to 35 s a query). The subset depends only on the seed and the
   layout, so both settings of A3 see the same pairs (`bench/run.py`, `arm_pairs`).
 - Change runs (`bench.churn`) and fault runs (`bench.faults`) are one job per seed on each store, on W3.
-- Raw outputs kept for every query: the k hit ids with scores, latency, errors.
+- Raw outputs kept for every query: the k hit ids with scores, latency, errors. A job writes its rows after each arm,
+  so a job stopped by the time limit keeps its finished arms.
+- A job that does not finish (an infrastructure failure or the 6-hour limit) is run again with the same seed; the
+  newest finished attempt is analysed and every attempt's raw output is kept. No job is run again because of its
+  results. The report lists every cell with fewer jobs than planned.
+- A0 is checked in every report: recall 1, nothing outside, no error, in every cell; any shortfall is reported as a
+  fault of the harness.
 
 ## 7. Hypotheses
 
@@ -150,28 +165,33 @@ wholly on the predicted side, **not supported** if wholly on the other side, oth
 - **H8** With the engine stopped, no arm returns a chunk outside the readable set.
 
 How each is judged (`bench/report.py`). A hypothesis over several cells is supported only if it is supported in every
-cell, not supported if it is not supported in any cell, and inconclusive otherwise (an intersection-union rule, so
-each cell's interval keeps the 99.375% level).
+cell, not supported if it is not supported in at least one cell, and inconclusive otherwise (an intersection-union
+rule, so each cell's interval keeps the 99.375% level). A cell with no data is "not run", which counts as
+inconclusive: it keeps a hypothesis from being supported.
 
 - H1, H2: cells are (store, implementation) on W1's own-mail pairs; the implementations are FGA and SpiceDB, which
   post-filter the same base search.
 - H3: cells are (store, share 0.001, 0.01 or 0.05, post-filter arm); the interval is for mean(negative) minus
   mean(positive), with the users of each layout resampled independently; predicted side: below 0.
-- H4: per store, the A3 cells at share 0.5 (both store settings, three correlations) meet the condition if in every
-  one more than half the queries failed or the median of the jobs' p50 latencies exceeds 10 s. Supported if at least
-  one store meets it, not supported otherwise. No interval: these are counts and medians.
-- H5: cells are the three correlation layouts at share 0.01.
+- H4: per store, the A3 cells at share 0.5 (each of the store's settings, two or, on OpenSearch, one; three
+  correlations) meet the condition if in every one more than half the queries failed or the median of the jobs' p50
+  latencies exceeds 10 s. Supported if at least one store meets it; not supported if every store has all its cells
+  and none meets it; inconclusive otherwise. No interval: these are counts and medians.
+- H5: cells are A4 on pgvector at its default setting (iterative scans off) on the three correlation layouts at
+  share 0.01.
 - H6: cells are (store, layout) for the five alternative settings and fifteen layouts; supported where the lower end
   is at least 0.9, not supported where the upper end is below 0.9.
 - H7: cells are (setting default or iterative, layout); the interval is for the per-user mean of paired differences
   (A5 minus A4, same job, user and question); supported where it lies inside (-0.02, 0.02), not supported where it
   lies wholly outside.
-- H8: a count over every fault run with engines refusing connections; supported if it is zero.
+- H8: a count over every fault run with engines refusing connections; not supported if it is above zero; supported
+  if it is zero and fault runs exist on all five stores; inconclusive otherwise.
 
 ## 8. Analysis
 
-- Unit: the user. Per-query values are averaged per user, then over users.
-- Intervals: bootstrap over users, 10,000 resamples, seed fixed in the analysis script; latency intervals over jobs.
+- Unit: the user. Per-query values are averaged per user over every query of every job, then over users.
+- Intervals: bootstrap over users, 10,000 resamples, each interval with its own generator seeded from a fixed seed
+  and the cell; latency: median and range over the jobs.
 - Paired differences between arms use the same queries and the same users, from the same jobs.
 - All cells are reported, including those no hypothesis covers. Failed or censored measurements are counted, not dropped.
 

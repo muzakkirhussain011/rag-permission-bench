@@ -19,6 +19,9 @@ from __future__ import annotations
 M = 16
 EF_CONSTRUCTION = 100
 EF_SEARCH = 100
+# The harness never cuts a search short: each store's client may wait this long for one call
+# (pre-registration, section 5). Longer calls are errors; for H4 any call over 30 s counts as failed.
+CALL_LIMIT_S = 600
 
 
 NAMES = ("pgvector", "qdrant", "milvus", "weaviate", "opensearch")

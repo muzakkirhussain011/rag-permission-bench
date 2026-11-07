@@ -15,7 +15,7 @@ import numpy as np
 
 from ..util import log, retry
 from ..workload import Workload
-from . import EF_CONSTRUCTION, EF_SEARCH, M
+from . import CALL_LIMIT_S, EF_CONSTRUCTION, EF_SEARCH, M
 
 HOST, PORT, GRPC_PORT = "localhost", 8090, 50061
 COLLECTION = "Chunk"
@@ -39,7 +39,11 @@ class Weaviate:
     def _connect(self):  # noqa: ANN202
         import weaviate
 
-        client = weaviate.connect_to_local(host=HOST, port=PORT, grpc_port=GRPC_PORT)
+        from weaviate.classes.init import AdditionalConfig, Timeout
+
+        # The client's default query timeout is 30 s; the harness allows every store the same CALL_LIMIT_S.
+        client = weaviate.connect_to_local(host=HOST, port=PORT, grpc_port=GRPC_PORT, additional_config=AdditionalConfig(
+            timeout=Timeout(init=30, query=CALL_LIMIT_S, insert=CALL_LIMIT_S)))
         if not client.is_ready():
             client.close()
             raise RuntimeError("Weaviate is not ready")

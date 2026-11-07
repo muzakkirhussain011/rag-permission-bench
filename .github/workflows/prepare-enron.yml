@@ -16,13 +16,18 @@ on:
         default: false
       release:
         description: release tag when publishing
-        default: data-enron-v1
+        default: data-enron-v2
+      shards_from_run:
+        description: reuse the embedded shards of this earlier run of this workflow (same corpus reading) instead of embedding again
+        default: ""
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   embed:
+    if: inputs.shards_from_run == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     strategy:
@@ -45,6 +50,7 @@ jobs:
 
   enron:
     needs: embed
+    if: ${{ !cancelled() && (needs.embed.result == 'success' || needs.embed.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -61,11 +67,20 @@ jobs:
         run: |
           curl -L --fail --retry 3 -o enron.tar.gz https://www.cs.cmu.edu/~enron/enron_mail_20150507.tar.gz
           ls -la enron.tar.gz && sha256sum enron.tar.gz
-      - uses: actions/download-artifact@v4
+      - if: inputs.shards_from_run == ''
+        uses: actions/download-artifact@v4
         with:
           pattern: enron-shard-*
           path: data/shards
           merge-multiple: true
+      - if: inputs.shards_from_run != ''
+        name: Reuse the shards of an earlier run (bench.w1_enron checks that they match this reading of the corpus)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.shards_from_run }}" -p 'enron-shard-*' -D data/shards-dl
+          mkdir -p data/shards && find data/shards-dl -type f -name 'shard_*' -exec mv {} data/shards/ \;
+          ls data/shards | head -30
       - run: python -m bench.w1_enron --tarball enron.tar.gz --out data/w1 --limit ${{ inputs.limit }} --shards 12 --assemble data/shards
       - run: python -m bench.truth --workload data/w1
       - name: Package

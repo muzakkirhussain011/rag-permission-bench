@@ -24,7 +24,7 @@ import numpy as np
 
 from ..util import log, retry
 from ..workload import Workload, principals
-from . import EF_CONSTRUCTION, EF_SEARCH, M
+from . import CALL_LIMIT_S, EF_CONSTRUCTION, EF_SEARCH, M
 
 DSN = "postgresql://postgres:bench@localhost:5432/bench"
 READER_DSN = "postgresql://bench_reader:reader@localhost:5432/bench"
@@ -45,6 +45,7 @@ def _connect(dsn: str):  # noqa: ANN202
     conn = psycopg.connect(dsn, autocommit=True, prepare_threshold=None)
     register_vector(conn)
     conn.execute(f"SET hnsw.ef_search = {EF_SEARCH}")
+    conn.execute(f"SET statement_timeout = '{CALL_LIMIT_S}s'")
     return conn
 
 

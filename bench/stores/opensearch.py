@@ -18,7 +18,7 @@ import numpy as np
 
 from ..util import log, retry
 from ..workload import Workload, principals
-from . import EF_CONSTRUCTION, EF_SEARCH, M
+from . import CALL_LIMIT_S, EF_CONSTRUCTION, EF_SEARCH, M
 
 HOST, PORT = "localhost", 9200
 ADMIN = ("admin", "Tq7-vector-Bench-41!")
@@ -133,13 +133,13 @@ class OpenSearch:
             where = {"terms": {"principals": principals}}
         elif ids is not None:
             where = {"ids": {"values": [str(i) for i in ids]}}
-        result = self.client.search(index=INDEX, body=_body(q, k, where), request_timeout=30)
+        result = self.client.search(index=INDEX, body=_body(q, k, where), request_timeout=CALL_LIMIT_S)
         return [(int(h["_id"]), float(h["_score"])) for h in result["hits"]["hits"]]
 
     def search_dls(self, q: np.ndarray, k: int, user: str) -> list[tuple[int, float]]:
         if user not in self.readers:
             self.readers[user] = _client((user, READER_PASSWORD))
-        result = self.readers[user].search(index=INDEX, body=_body(q, k, None), request_timeout=30)
+        result = self.readers[user].search(index=INDEX, body=_body(q, k, None), request_timeout=CALL_LIMIT_S)
         return [(int(h["_id"]), float(h["_score"])) for h in result["hits"]["hits"]]
 
     def set_principals(self, i: int, principals: list[str], vector: np.ndarray) -> None:

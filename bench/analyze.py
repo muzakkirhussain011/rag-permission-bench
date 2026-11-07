@@ -34,6 +34,8 @@ def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], l
             masks[key] = w.readable(row["user"], w.layout(row["layout"]).user_groups.get(row["user"], []))
         t = truth[(row["layout"], row["user"], row["q"])]
         s = score(row["hits"], t, masks[key], w.vectors, w.queries[row["q"]])
+        if row["error"]:  # an error returned nothing: counted as an error, not also as an empty answer
+            s["empty"] = False
         cells[(row["arm"], row["layout"])].append((row, s))
         scored.append({"arm": row["arm"], "layout": row["layout"], "user": row["user"], "q": row["q"],
                        "kind": kinds[row["layout"]].get(f"{row['user']}|{row['q']}"), "ms": row["ms"],
@@ -47,7 +49,7 @@ def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], l
     for (arm, layout), items in sorted(cells.items()):
         per_user: dict[str, list[float]] = defaultdict(list)
         for row, s in items:
-            if s["recall"] is not None and row["error"] is None:
+            if s["recall"] is not None:  # a failed query has recall 0: counted, not dropped
                 per_user[row["user"]].append(s["recall"])
         user_means = [float(np.mean(v)) for v in per_user.values()]
         ms = np.array([row["ms"] for row, _ in items])

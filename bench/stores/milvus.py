@@ -13,7 +13,7 @@ import numpy as np
 
 from ..util import log, retry
 from ..workload import Workload
-from . import EF_CONSTRUCTION, EF_SEARCH, M
+from . import CALL_LIMIT_S, EF_CONSTRUCTION, EF_SEARCH, M
 
 URI = "http://localhost:19530"
 COLLECTION = "chunks"
@@ -94,7 +94,7 @@ class Milvus:
             expression, values = "id in {ids}", {"ids": ids}
         result = self.client.search(
             COLLECTION, data=[np.asarray(q, dtype=np.float32).tolist()], anns_field="embedding", filter=expression,
-            filter_params=values, limit=k, search_params=params, output_fields=[], timeout=30,
+            filter_params=values, limit=k, search_params=params, output_fields=[], timeout=CALL_LIMIT_S,
         )
         return [(int(hit["id"]), float(hit["distance"])) for hit in result[0]]
 

@@ -164,6 +164,7 @@ def _fga_post(ctx: Context, multiple: int) -> Run:
         # `invoke`, as Auth0's README does; `ainvoke` is probed separately (see run.py).
         return _hits(retriever(user).invoke(key))[:K]
 
+    run.prepare = lambda users: [retriever(u) for u in users]  # built before timing starts
     return run
 
 
@@ -212,6 +213,7 @@ def _spicedb_pre(ctx: Context, setting: str) -> Run:
     async def run(user: str, groups: list[str], key: str) -> Hits:
         return _hits(await retriever(user).ainvoke(key))
 
+    run.prepare = lambda users: [retriever(u) for u in users]  # built before timing starts
     return run
 
 
