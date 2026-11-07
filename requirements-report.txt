@@ -1,0 +1,2 @@
+# Figures only (bench.figures); the report itself needs numpy alone.
+matplotlib==3.10.3

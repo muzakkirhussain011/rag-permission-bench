@@ -81,10 +81,20 @@ jobs:
         run: |
           sudo sysctl -w vm.max_map_count=262144
           docker compose --profile ${{ inputs.store }} --profile authz up -d
+      - name: Name the outputs
+        id: name
+        env:
+          LAYOUTS: ${{ inputs.layouts }}
+        run: |
+          # A W3 seed runs as one job per share; the shares a job covers go into its name (w3_s0p5_neg -> s0p5).
+          part=$(printf '%s' "$LAYOUTS" | tr ',' '\n' | sed -nE 's/^w3_(s[0-9p]+)_.*/\1/p' | sort -u | paste -sd+ -)
+          name="${{ inputs.label }}-${{ inputs.kind }}-${{ inputs.workload }}${part:+-$part}-${{ inputs.store }}-seed${{ inputs.seed }}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "$name"
       - name: Run
         env:
           W: ${{ inputs.workload }}
-          OUT: results/${{ inputs.label }}-${{ inputs.kind }}-${{ inputs.workload }}-${{ inputs.store }}-seed${{ inputs.seed }}
+          OUT: results/${{ steps.name.outputs.name }}
         run: |
           mkdir -p results
           partitions=""
@@ -115,6 +125,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.label }}-${{ inputs.kind }}-${{ inputs.workload }}-${{ inputs.store }}-seed${{ inputs.seed }}
+          name: ${{ steps.name.outputs.name || format('{0}-{1}-{2}-{3}-seed{4}', inputs.label, inputs.kind, inputs.workload, inputs.store, inputs.seed) }}
           path: results/
-          retention-days: 90
+          retention-days: 90  # measured outputs are also published as a release (report.yml), which keeps them

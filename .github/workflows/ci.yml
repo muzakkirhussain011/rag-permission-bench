@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-run.txt
+      - run: pip install -r requirements-run.txt -r requirements-report.txt
       - name: Record the resolved packages
         run: pip freeze --all | tee requirements-resolved.txt
       - name: Print the installed integration code that the arms run

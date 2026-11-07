@@ -1,0 +1,75 @@
+name: report
+
+# The study's report: collect every measured job's outputs, score nothing new (each job scored its own
+# run), apply the pre-registered analysis (bench.report), draw the figures (bench.figures), and keep it
+# all as an artifact. With `publish`, the raw outputs and the report also become a release, so they
+# outlive artifact retention (and Zenodo archives the release when its GitHub link is on).
+
+on:
+  workflow_dispatch:
+    inputs:
+      prefix:
+        description: collect artifacts whose name starts with this
+        default: measured-
+      publish:
+        description: also publish a release with the raw outputs and the report (tag below)
+        type: boolean
+        default: false
+      tag:
+        description: release tag when publishing
+        default: results-v1
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write  # only used with publish
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt -r requirements-report.txt
+      - name: Collect the measured jobs' outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFIX: ${{ inputs.prefix }}
+        run: |
+          mkdir -p artifacts
+          # Newest artifact per name: a job re-run after an infrastructure failure replaces its earlier attempt.
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith($ENV.PREFIX)) | [.id, .name, .workflow_run.id, .created_at] | @tsv' \
+            | sort -t$'\t' -k2,2 -k1,1nr | awk -F'\t' '!seen[$2]++' > collected.tsv
+          while IFS=$'\t' read -r id name run created; do
+            gh api "repos/${{ github.repository }}/actions/artifacts/$id/zip" > a.zip
+            unzip -q -o a.zip -d "artifacts/$name" -x compose.log
+            rm a.zip
+          done < collected.tsv
+          echo "collected $(wc -l < collected.tsv) artifacts"
+      - run: python -m bench.report --results artifacts --out report
+      - run: python -m bench.figures --report report --out report/figures
+      - name: Bundle
+        run: |
+          cp collected.tsv report/
+          tar czf results-raw.tar.gz artifacts
+          tar czf report.tar.gz report
+          sha256sum results-raw.tar.gz report.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: |
+            report/
+            SHA256SUMS
+      - if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.tag }}" results-raw.tar.gz report.tar.gz SHA256SUMS \
+            --title "Measured results (${{ inputs.tag }})" --target "${{ github.sha }}" \
+            --notes "Raw outputs of every measured job (collected.tsv in report.tar.gz lists them, with their workflow runs) and the report made from them by bench.report and bench.figures at this commit."
