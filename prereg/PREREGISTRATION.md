@@ -1,8 +1,9 @@
-# Pre-registration (DRAFT, not deposited): enforcing document permissions in vector search
+# Pre-registration: enforcing document permissions in vector search
 
-Author: Syed Muzakkir Hussain. Draft of 2026-11-06, first made public in this repository the same day. Until the
-Zenodo deposit, which comes before the first measured run, every change to this file is visible in its git history.
-Changes after deposit go in a dated amendments section at the end, never in place.
+Author: Syed Muzakkir Hussain. First made public in this repository on 2026-11-06; deposited on 2026-11-07 as
+release `prereg-v1` of this repository, which Zenodo archives with a DOI, before any measured run. Every change before
+deposit is in this file's git history. Changes after deposit go in a dated amendments section at the end, never in
+place.
 
 ## 1. Status at writing
 
@@ -43,6 +44,15 @@ Changes after deposit go in a dated amendments section at the end, never in plac
     print plan shapes only. The plans were made with each query's own parameters, while the measured queries ran
     through psycopg's automatic prepared statements, under which PostgreSQL may reuse one generic plan; the
     harness now plans every pgvector query with its own parameters (section 3).
+  - Third pilot (seed 103, after those changes; timings, errors and plan shapes only): every store loaded the full
+    workloads, OpenSearch with 2,500 document-level-security roles for 1,500 users. With each query planned with
+    its own parameters, A4 on pgvector answered 300 W3 queries in about 1 s in total at the default setting, where
+    it had taken 171 s, so it no longer runs as the exact control does. The fault pilot (pgvector, 100 queries per
+    fault) printed error counts per arm and fault, not outside counts; the change pilot printed change delays, an
+    exploratory measure. The per-share W3 jobs it implies take at most about 4.5 hours.
+- An independent review of the analysis code against this document, before deposit, found that failed queries were
+  dropped from recall and that H4's 30 s rule was not applied; the code and this text were corrected (sections 5
+  to 8), and the report's rules are covered by tests (`tests/test_report.py`).
 
 ## 2. Questions
 
@@ -62,7 +72,7 @@ Changes after deposit go in a dated amendments section at the end, never in plac
 | A4 | Reader groups on chunks | each store's filtered search at its default and at its documented alternative setting; OpenSearch has one setting, the filter inside the k-NN query, which its documentation calls efficient filtering (H6 uses it) |
 | A5 | Database-native | PostgreSQL row-level security with pgvector; OpenSearch document-level security (one role per principal, each user mapped to the roles of their principals) |
 | A6 | Partitioning | one pgvector table and HNSW index per role (W2) or per user (W1), searched and merged; HoneyBee if its authors license the code |
-| A7 | wardowl | one commit, pinned before deposit, on pgvector and Qdrant |
+| A7 | wardowl | commit b5d1bfc of its main branch (2026-10-30), pinned in `requirements-run.txt`, on pgvector and Qdrant |
 
 Stores: pgvector, Qdrant, Milvus, Weaviate, OpenSearch; exact versions in `compose.yml` and the lock file, image
 digests recorded with every run. HNSW is built with m = 16 and ef_construction = 100 and searched with ef = 100 on

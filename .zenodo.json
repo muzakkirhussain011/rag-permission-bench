@@ -1,0 +1,11 @@
+{
+  "title": "Pre-registration: Enforcing Document Permissions in Vector Search, an Experimental Comparison",
+  "upload_type": "other",
+  "description": "<p>Study plan, hypotheses H1 to H8 with their judging rules, measures and analysis, deposited before any measured run, together with the benchmark harness at the same commit. The pre-registration is <code>prereg/PREREGISTRATION.md</code>; everything seen before deposit (continuous-integration runs on synthetic data and timing-only pilots) is listed in its section 1. Code and history: https://github.com/muzakkirhussain011/rag-permission-bench. The study includes wardowl, the author's own library, as one arm; this is a declared conflict of interest.</p>",
+  "creators": [
+    {"name": "Hussain, Syed Muzakkir", "affiliation": "Independent Researcher"}
+  ],
+  "license": "Apache-2.0",
+  "keywords": ["pre-registration", "retrieval-augmented generation", "access control", "vector search", "benchmark", "authorization"],
+  "access_right": "open"
+}
