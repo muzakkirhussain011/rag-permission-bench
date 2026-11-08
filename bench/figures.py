@@ -29,7 +29,8 @@ SHARES = [0.001, 0.01, 0.05, 0.2, 0.5]
 
 def strategies(store: str) -> list[tuple[str, list[str]]]:
     """(label, arm names in order of preference) for the W3 figures; the first arm present is drawn.
-    Post-filters are drawn with SpiceDB; OpenFGA's rows are in the tables."""
+    Post-filters are drawn with SpiceDB; OpenFGA's rows are in the tables. A store's alternative setting
+    (`ALTERNATIVE`) shares one label, since each store has one."""
     alt = ALTERNATIVE[store]
     return [
         ("A1 post-filter, k", ["a1-spicedb"]),
@@ -37,10 +38,29 @@ def strategies(store: str) -> list[tuple[str, list[str]]]:
         ("A2 post-filter, 10k", ["a2-spicedb-x10"]),
         ("A3 engine pre-filter", ["a3-spicedb@default"]),
         ("A4 store filter, default", ["a4@default"]),
-        (f"A4 store filter, {alt}", [f"a4@{alt}"] if alt != "default" else []),
+        ("A4 store filter, alternative", [f"a4@{alt}"] if alt != "default" else []),
         ("A5 database-native", ["a5-rls@default", "a5-dls"]),
         ("A7 wardowl", ["a7-wardowl"]),
     ]
+
+
+SETTING_NAMES = {"default": "default", "iterative": "iterative", "acorn": "ACORN", "pathseer": "PathSeer"}
+
+
+def arm_label(name: str) -> str:
+    """A readable label for an arm id such as `a2-spicedb-x10` or `a4@acorn`."""
+    arm, _, setting = name.partition("@")
+    setting = SETTING_NAMES.get(setting, setting)
+    engine = {"fga": "OpenFGA", "spicedb": "SpiceDB"}
+    if arm.startswith(("a1-", "a2-")):
+        parts = arm.split("-")
+        what = "A1 post-filter" if parts[0] == "a1" else f"A2 over {parts[2][1:]}k"
+        return f"{what}, {engine[parts[1]]}"
+    labels = {"a0": "A0 exact control", "a3-spicedb": "A3 engine pre-filter", "a4": "A4 store filter",
+              "a5-rls": "A5 row-level security", "a5-dls": "A5 document-level security", "a6-partition": "A6 partitions",
+              "a7-wardowl": "A7 wardowl"}
+    label = labels.get(arm, name)
+    return f"{label}, {setting}" if setting else label
 
 
 def _plt():  # noqa: ANN202
@@ -170,7 +190,7 @@ def churn(rows: list[dict], out: Path) -> Path | None:
                 ax.errorbar([max(p50, 1e-3)], [y + offset], xerr=[[0], [max(p90 - p50, 0)]], color=SLOTS[slot],
                             marker=MARKERS[slot], capsize=0, elinewidth=0.6, label=store if y == 0 else None)
         ax.set_xscale("log")
-        ax.set_yticks(range(len(arms)), arms)
+        ax.set_yticks(range(len(arms)), [arm_label(a) for a in arms])
         ax.set_title("revocation" if kind == "revoke" else "grant")
         ax.set_xlabel("delay until answers reflect it (s)")
     axes[0][1].legend(frameon=False, loc="lower right")

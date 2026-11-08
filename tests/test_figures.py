@@ -42,3 +42,15 @@ def test_every_figure_is_a_pdf_without_type3_fonts(tmp_path):
         data = path.read_bytes()
         assert data.startswith(b"%PDF")
         assert b"/Type3" not in data and b"/FontType 3" not in data
+
+
+def test_arm_labels_are_readable():
+    from bench.figures import arm_label
+
+    assert arm_label("a1-fga") == "A1 post-filter, OpenFGA"
+    assert arm_label("a2-spicedb-x10") == "A2 over 10k, SpiceDB"
+    assert arm_label("a3-spicedb@acorn") == "A3 engine pre-filter, ACORN"
+    assert arm_label("a4@pathseer") == "A4 store filter, PathSeer"
+    assert arm_label("a5-rls@iterative") == "A5 row-level security, iterative"
+    assert arm_label("a5-dls") == "A5 document-level security"
+    assert arm_label("a7-wardowl") == "A7 wardowl"
