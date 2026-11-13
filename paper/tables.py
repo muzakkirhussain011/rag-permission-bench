@@ -3,9 +3,9 @@
     python paper/tables.py <report folder> <output folder>
 
 <report folder> is `report/` from the release's report.tar.gz, or a report rebuilt from results-raw.tar.gz with
-`python -m bench.report`. Writes tab-hypotheses.tex, tab-quality.tex, tab-faults.tex and numbers.tex (macros for the
-numbers the text quotes) into <output folder>. Every value is read from cells.json, hypotheses.json, faults.json or
-churn.json; nothing is typed by hand.
+`python -m bench.report`. Writes tab-hypotheses.tex, tab-quality.tex, tab-faults.tex, tab-regimes.tex and numbers.tex
+(macros for the numbers the text quotes) into <output folder>. Every value is read from cells.json, hypotheses.json,
+faults.json or churn.json; nothing is typed by hand.
 """
 
 import collections
@@ -48,10 +48,11 @@ ROWS = [
 ]
 WORK = [("w1_enron", "W1"), ("w2_tree_a", "Tree"), ("w2_uniform_a", "Uniform"), ("w2_erbac_a", "ERBAC-A"),
         ("w2_erbac_b", "ERBAC-B")]
-lines = [r"\begin{table*}[t]", r"\caption{Recall@10 on real sharing (W1, Enron, all 3{,}985 questions) and HoneyBee's role-based "
+lines = [r"\begin{table*}[t]", r"\caption{Recall@10 on real sharing (W1, Enron, all 3{,}985 questions, 2{,}000 of them about "
+         r"mail the user may not read) and HoneyBee's role-based "
          r"workloads (W2), mean over users and three seeds; a range spans the stores an arm ran on. The exact control "
-         r"(A0) scored 1.000 in every cell. Per-store values with 95\% intervals are in \texttt{cells.json} of the "
-         r"results release.}", r"\label{tab:quality}", r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
+         r"(A0) scored 1.000 in every cell. OpenSearch has one setting, counted in the default rows only. "
+         r"Per-store values with 95\% intervals are in \texttt{cells.json} of the results release.}", r"\label{tab:quality}", r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
          r" & W1 & \multicolumn{4}{c}{W2} \\ \cmidrule(l){3-6}",
          "Arm & Enron & " + " & ".join(n for _, n in WORK[1:]) + r" \\", r"\midrule"]
 for label, pick in ROWS:
@@ -146,12 +147,72 @@ for label, _ in FAMS:
 lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
 (OUT / "tab-faults.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+# ---- Regimes: a summary of the W3 cells by readable share ----
+SHARES = [("0p001", "0.001"), ("0p01", "0.01"), ("0p05", "0.05"), ("0p2", "0.2"), ("0p5", "0.5")]
+CORRS = ("neg", "none", "pos")
+STORES = [("pgvector", "pgvector"), ("qdrant", "Qdrant"), ("milvus", "Milvus"), ("weaviate", "Weaviate"),
+          ("opensearch", "OpenSearch")]
+SETTING = {"default": "default", "iterative": "iterative", "acorn": "ACORN", "pathseer": "PathSeer"}
+W3 = {(c["layout"], c["store"], c["arm"]): c for c in cells if c["workload"] == "w3"}
+
+
+def ms(x):
+    return f"{x:.1f}" if x < 1000 else f"{x / 1000:.1f}\\,s"
+
+
+def span(values):
+    lo, hi = ms(min(values)), ms(max(values))
+    return lo if lo == hi else f"{lo}--{hi}"
+
+
+lines = [r"\begin{table*}[t]",
+         r"\caption{The controlled sweep (W3) by readable share, summarizing Figures~\ref{fig:w3-recall} and "
+         r"\ref{fig:w3-p50}: which stores' own filters (A4) recalled 1.000 (to three decimals) under all three "
+         r"correlations, and their median latency, or else the store filter whose lowest recall over the correlations "
+         r"was highest; the store filter with the lowest recall; the exact control's median "
+         r"latency (A0, pgvector, one question per user, so over a subset of the questions the other arms answered); "
+         r"and the highest recall of any post-filter (A1, A2). Latencies in ms unless marked; ranges span the three "
+         r"correlations and the stores named.}",
+         r"\label{tab:regimes}", r"\footnotesize", r"\begin{tabular}{@{}lllll@{}}", r"\toprule",
+         r"Share & A4 recalling 1.000 under every correlation (median latency) & Lowest A4 recall & A0 median latency & "
+         r"Best post-filter recall \\", r"\midrule"]
+for code, label in SHARES:
+    exact, lat, worst, best = [], [], None, None
+    for st, name in STORES:
+        settings = sorted({a.split("@")[1] for (l, s, a) in W3 if s == st and a.startswith("a4@")},
+                          key=lambda x: x != "default")
+        ok = []
+        for setting in settings:
+            cs = [W3[(f"w3_s{code}_{corr}", st, f"a4@{setting}")] for corr in CORRS]
+            low = min(c["recall"] for c in cs)
+            if worst is None or low < worst[0]:
+                worst = (low, name, SETTING[setting])
+            if best is None or low > best[0]:
+                best = (low, name, SETTING[setting], [c["p50_ms"]["median"] for c in cs])
+            if f(low) == "1.000":
+                ok.append(setting)
+                lat += [c["p50_ms"]["median"] for c in cs]
+        if ok:
+            exact.append(name if len(settings) == 1 else
+                         f"{name} (both)" if len(ok) == len(settings) else f"{name} ({SETTING[ok[0]]})")
+    a0 = [W3[(f"w3_s{code}_{corr}", "pgvector", "a0")]["p50_ms"]["median"] for corr in CORRS]
+    post = max(c["recall"] for (l, s, a), c in W3.items() if l.startswith(f"w3_s{code}_") and a.startswith(("a1", "a2")))
+    held = (", ".join(exact) + f" ({span(lat)})" if exact else
+            f"none; best {f(best[0])} ({best[1]}, {best[2]}; {span(best[3])})")
+    lines.append(" & ".join([label, held, f"{f(worst[0])} ({worst[1]}, {worst[2]})", span(a0), f(post)]) + r" \\")
+lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}"]
+(OUT / "tab-regimes.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
 # ---- Numbers the text quotes ----
 tot = collections.Counter()
 for c in cells:
     for x in ("queries", "outside", "errors", "empty", "over_30s"):
         tot[x] += c[x]
+# Distinct (user, question) pairs: every pair is asked once per job by an arm that answers every pair (A1 with
+# SpiceDB answers every pair in every cell), so its queries over its jobs, summed over workloads and layouts.
+pairs = sum(c["queries"] // c["jobs"] for c in cells if c["store"] == "pgvector" and c["arm"] == "a1-spicedb")
 nums = {
+    "NumPairs": f"{pairs:,}",
     "NumCells": f"{len(cells):,}", "NumQueries": f"{tot['queries']:,}", "NumOutside": str(tot["outside"]),
     "NumErrors": str(tot["errors"]), "NumFaultRows": f"{sum(c['queries'] for c in faults):,}",
     "NumFaultOutside": str(outside), "NumChurnEvents": f"{sum(r['events'] for r in churn):,}",

@@ -1,0 +1,57 @@
+{
+ "checksums": [
+  "176ab017dc7cd5f0a75a9c092c169cb867e2a6545cc6caaea39dc70945110506  results-raw.tar.gz",
+  "85f2f25eadf1b9f2192c6babcd05829918394ff7366a066bfac479ee1c9a7262  report.tar.gz"
+ ],
+ "files": {
+  "cells.json": {
+   "compared": true,
+   "differences": 0,
+   "first": [],
+   "identical": true,
+   "max_abs_numeric_difference": 0.0
+  },
+  "churn.json": {
+   "compared": true,
+   "differences": 0,
+   "first": [],
+   "identical": true,
+   "max_abs_numeric_difference": 0.0
+  },
+  "coverage.json": {
+   "compared": true,
+   "differences": 0,
+   "first": [],
+   "identical": true,
+   "max_abs_numeric_difference": 0.0
+  },
+  "faults.json": {
+   "compared": true,
+   "differences": 0,
+   "first": [],
+   "identical": true,
+   "max_abs_numeric_difference": 0.0
+  },
+  "harness.json": {
+   "compared": true,
+   "differences": 0,
+   "first": [],
+   "identical": true,
+   "max_abs_numeric_difference": 0.0
+  },
+  "hypotheses.json": {
+   "compared": true,
+   "differences": 0,
+   "first": [],
+   "identical": true,
+   "max_abs_numeric_difference": 0.0
+  }
+ },
+ "git_sha": "1260760b76ab1ee832b03d4065270733a0dd83c5",
+ "made_by": "bench.extras",
+ "registered_analysis": false,
+ "release": "results-v1",
+ "repository": "muzakkirhussain011/rag-permission-bench",
+ "run_id": "43465687888",
+ "seed": 5
+}
