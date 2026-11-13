@@ -69,12 +69,12 @@ def _job(root, name, workload, store, rows, load):
         write_jsonl_gz(root / name / f"{name}.scored.jsonl.gz", rows)
 
 
-def _workload(root, name, layouts, truth, stats=None):
-    write_json(root / name / "meta.json", {"name": name, "n_chunks": 1000, "n_queries": 6})
-    write_json(root / name / "layouts.json", layouts)
-    write_jsonl_gz(root / name / "truth.jsonl.gz", truth)
+def _workload(root, folder, layouts, truth, stats=None, name=None):
+    write_json(root / folder / "meta.json", {"name": name or folder, "n_chunks": 1000, "n_queries": 6})
+    write_json(root / folder / "layouts.json", layouts)
+    write_jsonl_gz(root / folder / "truth.jsonl.gz", truth)
     if stats:
-        write_json(root / name / stats[0], stats[1])
+        write_json(root / folder / stats[0], stats[1])
 
 
 def test_the_whole_pass_on_made_up_releases(tmp_path, monkeypatch):
@@ -113,7 +113,7 @@ def test_the_whole_pass_on_made_up_releases(tmp_path, monkeypatch):
     truth1 = [{"layout": "w1_enron", "user": f"u{u}", "q": 10 * u + q, "sigma_g": 0.001, "sigma_l": 0.0,
                "rho": -1.0, "n_readable": 60} for u in range(6) for q in range(4)]
     _workload(wl, "w1", [{"name": "w1_enron", "params": {"kinds": kinds}}], truth1,
-              ("w1-stats.json", {"messages": 1000}))
+              ("w1-stats.json", {"messages": 1000}), name="w1_enron")  # the release's folder is w1, its name w1_enron
     truth2 = [{"layout": "w2_tree_a", "user": f"u{u}", "q": q, "sigma_g": 0.04, "sigma_l": None, "rho": None,
                "n_readable": 40} for u in range(3) for q in range(2)]
     _workload(wl, "w2_tree_a", [{"name": "w2_tree_a", "params": {"variant": "tree_a"}}], truth2,
