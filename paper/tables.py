@@ -167,14 +167,14 @@ def span(values):
 
 lines = [r"\begin{table*}[t]",
          r"\caption{The controlled sweep (W3) by readable share, summarizing Figures~\ref{fig:w3-recall} and "
-         r"\ref{fig:w3-p50}: which stores' own filters (A4) recalled 1.000 (to three decimals) under all three "
-         r"correlations, and their median latency, or else the store filter whose lowest recall over the correlations "
+         r"\ref{fig:w3-p50}: which stores' own filters (A4) recalled 1.000 (to three decimals) in all three folder "
+         r"orders, and their median latency, or else the store filter whose lowest recall over the orders "
          r"was highest; the store filter with the lowest recall; the exact control's median "
          r"latency (A0, pgvector, one question per user, so over a subset of the questions the other arms answered); "
          r"and the highest recall of any post-filter (A1, A2). Latencies in ms unless marked; ranges span the three "
-         r"correlations and the stores named.}",
+         r"folder orders and the stores named.}",
          r"\label{tab:regimes}", r"\footnotesize", r"\begin{tabular}{@{}lllll@{}}", r"\toprule",
-         r"Share & A4 recalling 1.000 under every correlation (median latency) & Lowest A4 recall & A0 median latency & "
+         r"Share & A4 recalling 1.000 in every folder order (median latency) & Lowest A4 recall & A0 median latency & "
          r"Best post-filter recall \\", r"\midrule"]
 for code, label in SHARES:
     exact, lat, worst, best = [], [], None, None
