@@ -1,0 +1,83 @@
+name: extras
+
+# Supplementary analyses of a measured release, computed here rather than on a personal machine. Not the registered
+# analysis (bench.report, which report.yml runs); part (c) of bench.extras is exploratory. One job:
+# - rebuilds the report and its figures from the release's raw outputs (bench.report, bench.figures), the way
+#   report.yml made them, and bench.extras compares the rebuilt report with the published one;
+# - regenerates the paper's tables and digest from the published report (paper/tables.py, paper/digest.py);
+# - runs bench.extras: (a) achieved readable shares and per-query correlation from the workloads' exact answers,
+#   (b) latency percentiles, memory, sizes and build times the jobs recorded, (c) the registered intervals of H1 to H8
+#   with questions resampled as clusters.
+# Everything is kept as the artifact `extras`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: results release to analyse
+        default: results-v1
+      resamples:
+        description: bootstrap resamples for part (c)
+        default: "10000"
+
+permissions:
+  contents: read
+
+env:
+  # Releases are read from the study's repository, so the workflow also runs in a fork.
+  RELEASES_REPO: muzakkirhussain011/rag-permission-bench
+
+jobs:
+  extras:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: df -h / && nproc && free -g
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt -r requirements-report.txt
+      - name: Fetch and check the release and the workloads' exact answers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p release published data/msmarco data/enron workloads out
+          gh release download "$TAG" -R "$RELEASES_REPO" -D release
+          (cd release && sha256sum -c SHA256SUMS)
+          tar xzf release/results-raw.tar.gz            # artifacts/<job>/
+          tar xzf release/report.tar.gz -C published     # published/report/
+          gh release download data-msmarco-v1 -R "$RELEASES_REPO" -D data/msmarco \
+            -p 'w3-workload.tar.gz' -p 'w2_*-workload.tar.gz' -p SHA256SUMS
+          (cd data/msmarco && sha256sum -c SHA256SUMS --ignore-missing)
+          gh release download data-enron-v2 -R "$RELEASES_REPO" -D data/enron -p w1-workload.tar.gz -p SHA256SUMS
+          (cd data/enron && sha256sum -c SHA256SUMS --ignore-missing)
+          for f in data/msmarco/*-workload.tar.gz data/enron/*-workload.tar.gz; do
+            name=$(basename "$f" -workload.tar.gz)
+            mkdir -p "workloads/$name" && tar xzf "$f" -C "workloads/$name"
+          done
+          echo "$(ls artifacts | wc -l) job folders"; ls workloads
+      - name: Rebuild the report and the figures from the raw outputs, as report.yml does
+        run: |
+          python -m bench.report --results artifacts --out rebuilt/report
+          python -m bench.figures --report rebuilt/report --out rebuilt/report/figures
+      - name: The paper's tables and digest from the published report
+        run: |
+          python paper/tables.py published/report out/paper-tables
+          python paper/digest.py published/report > out/paper-tables/digest.md
+      - name: Supplementary analyses (bench.extras)
+        env:
+          TAG: ${{ inputs.tag }}
+          RESAMPLES: ${{ inputs.resamples }}
+        run: |
+          python -m bench.extras --results artifacts --report published/report --rebuilt rebuilt/report \
+            --workloads workloads --out out/extras --resamples "$RESAMPLES" --release "$TAG" \
+            --checksums release/SHA256SUMS
+          cp -r rebuilt/report/figures out/rebuilt-figures
+          cat out/extras/README.md >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extras
+          path: out/
