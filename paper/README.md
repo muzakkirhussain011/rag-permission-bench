@@ -6,7 +6,7 @@ sums, counts, minima, maxima and medians over its cells. Every recall, interval 
 
 | script | writes |
 |---|---|
-| `tables.py` | `tab-quality.tex` (recall@10 on W1 and W2 per arm, range over stores), `tab-hypotheses.tex` (H1 to H8 and their verdicts), `tab-faults.tex` (errors and empty answers under engine faults), `numbers.tex` (macros for the counts the text quotes) |
+| `tables.py` | `tab-quality.tex` (recall@10 on W1 and W2 per arm, range over stores), `tab-hypotheses.tex` (H1 to H8 and their verdicts), `tab-faults.tex` (errors and empty answers under engine faults), `tab-regimes.tex` (the W3 sweep summarized by readable share), `numbers.tex` (macros for the counts the text quotes) |
 | `digest.py` | a Markdown digest of every cell, hypothesis part, change delay and fault count, from which the text's numbers were taken |
 
 The figures are made by `bench.figures` (see the main README). The paper's text is not part of this repository.

@@ -24,8 +24,14 @@ def test_tables_and_digest_run_on_a_report(tmp_path):
     rep = tmp_path / "report"
     cells = [_cell("w1_enron", "pgvector", "a1-fga", "w1_enron", 0.3),
              _cell("w2_tree_a", "pgvector", "a4@default", "w2_tree_a", 0.9),
-             _cell("w3", "pgvector", "a3-spicedb@default", "w3_s0p5_neg", 0.7),
-             _cell("w3", "qdrant", "a4@acorn", "w3_s0p01_pos", 0.95)]
+             _cell("w3", "pgvector", "a3-spicedb@default", "w3_s0p5_neg", 0.7)]
+    # the regime table reads every W3 share and correlation of A0, the store filters and a post-filter
+    for share in ("0p001", "0p01", "0p05", "0p2", "0p5"):
+        for corr in ("neg", "none", "pos"):
+            layout = f"w3_s{share}_{corr}"
+            cells += [_cell("w3", "pgvector", "a0", layout, 1.0), _cell("w3", "pgvector", "a4@default", layout, 0.9),
+                      _cell("w3", "pgvector", "a4@iterative", layout, 1.0),
+                      _cell("w3", "pgvector", "a1-spicedb", layout, 0.5)]
     hypotheses = {
         "H1": {"verdict": "supported", "parts": [{"store": "pgvector", "arm": "a1-fga", "interval": [0.2, 0.3],
                                                    "verdict": "supported"}]},
@@ -57,8 +63,8 @@ def test_tables_and_digest_run_on_a_report(tmp_path):
     out = tmp_path / "generated"
     subprocess.run([sys.executable, str(ROOT / "paper" / "tables.py"), str(rep), str(out)], check=True)
     assert {p.name for p in out.iterdir()} == {"tab-hypotheses.tex", "tab-quality.tex", "tab-faults.tex",
-                                               "numbers.tex"}
-    assert "\\newcommand{\\NumCells}{4}" in (out / "numbers.tex").read_text(encoding="utf-8")
+                                               "tab-regimes.tex", "numbers.tex"}
+    assert f"\\newcommand{{\\NumCells}}{{{len(cells)}}}" in (out / "numbers.tex").read_text(encoding="utf-8")
     digest = subprocess.run([sys.executable, str(ROOT / "paper" / "digest.py"), str(rep)], check=True,
                             capture_output=True, text=True, encoding="utf-8").stdout
     assert digest.startswith("# Digest of results-v1")

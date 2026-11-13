@@ -12,10 +12,13 @@ The measured runs are finished and analysed.
 - The plan was deposited before any measured run: [`prereg/PREREGISTRATION.md`](prereg/PREREGISTRATION.md), release
   `prereg-v1`, [doi:10.5281/zenodo.24026269](https://doi.org/10.5281/zenodo.24026269).
 - All 180 measured jobs ran in one run of the `measure` workflow at commit `d31238b`, from 2026-11-07 02:39 UTC to
-  2026-11-08 06:07 UTC, each on a GitHub-hosted `ubuntu-24.04` runner; every job finished on its first attempt.
-  A job took 0.23 to 4.59 hours (median 0.8), 214 runner-hours in all (GitHub's job records).
+  2026-11-08 06:07 UTC, each on its own GitHub-hosted `ubuntu-24.04` runner, which every job recorded as 4 CPUs and
+  15.6 GiB of memory; every job finished on its first attempt. A job took 0.23 to 4.59 hours (median 0.8), 214
+  runner-hours in all (GitHub's job records).
 - The pre-registered analysis of their outputs (`bench.report`, `bench.figures`) is the release `results-v1`
   (2026-11-08), made by the `report` workflow at commit `d3099e9`.
+- Supplementary analyses of `results-v1` (section 4 below), outside the registered analysis, are in
+  [`reports/extras-results-v1/`](reports/extras-results-v1/README.md).
 
 ## What is compared
 
@@ -87,9 +90,10 @@ python paper/digest.py rebuilt > paper-tables/digest.md
 
 The install line is the one `report.yml` uses; `bench.report` itself needs only numpy, `bench.figures` also
 matplotlib, and the scripts in [`paper/`](paper) only the standard library. `bench.report` seeds every interval
-from `--seed` (default 5) and the cell, so a rebuild with the pinned numpy should give the published `cells.json`
-and `hypotheses.json`; the `extras` workflow (section 4) checks this. The tables and the digest the paper's numbers
-come from are made by [`paper/tables.py` and `paper/digest.py`](paper/README.md).
+from `--seed` (default 5) and the cell. Run this way in GitHub Actions (`extras` workflow run 43465687888), the
+rebuild gave `cells.json`, `hypotheses.json`, `faults.json`, `churn.json`, `coverage.json` and `harness.json`
+identical to the published ones ([`rebuild.json`](reports/extras-results-v1/rebuild.json)). The tables and the
+digest the paper's numbers come from are made by [`paper/tables.py` and `paper/digest.py`](paper/README.md).
 
 ### 2. Re-run one measured cell
 
@@ -158,7 +162,8 @@ paper's tables, and runs `bench.extras`: (a) the readable share each user achiev
 per layout, and the W2 readable shares beside HoneyBee's; (b) p99 latency, memory, sizes and build times as the jobs
 recorded them, and what was not recorded; (c) an exploratory sensitivity analysis of the registered intervals of H1
 to H8 with questions resampled as clusters. None of it is the registered analysis. The outputs are the artifact
-`extras`.
+`extras`; those of run 43465687888 (commit `1260760`, 10,000 resamples) are committed in
+[`reports/extras-results-v1/`](reports/extras-results-v1/README.md).
 
 ### Check the harness on synthetic data
 
