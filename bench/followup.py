@@ -60,7 +60,8 @@ def load(results: Path) -> tuple[list[dict], list[dict], list[dict]]:
                "seed": args.get("seed"), "git_sha": env.get("git_sha"), "run_id": env.get("run_id"),
                "cpus": env.get("cpus"), "memory": env.get("memory"), "complete": meta.get("complete"),
                "status": meta.get("status"), "arms": len(meta.get("arms", [])), "pairs": meta.get("pairs"),
-               "unreadable_by_all": meta.get("unreadable_by_all")}
+               "unreadable_by_all": meta.get("unreadable_by_all"),
+               "store_load": (meta.get("load") or {}).get("store")}  # e.g. Qdrant's and OpenSearch's segments
         raw = meta_path.with_name(f"{name}.jsonl.gz")
         scored = meta_path.with_name(f"{name}.scored.jsonl.gz")
         if job["kind"] == "churn":
@@ -267,9 +268,49 @@ def churn_summary(rows: list[dict], baseline: list[dict]) -> list[dict]:
     return out
 
 
-def reproduction(table: list[dict], baseline: list[dict]) -> dict:
-    """Every cell measured at ef 100 under a name results-v1 used, beside results-v1's cell."""
+def job_recalls(rows: list[dict]) -> dict[tuple, list[dict]]:
+    """Each job's own recall in each cell (users' means within that job, then their mean), with its seed."""
+    groups: dict[tuple, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    for r in rows:
+        groups[(r["workload"], r["store"], r["arm"], r["layout"])][r["job"]].append(r)
+    out = {}
+    for key, jobs in groups.items():
+        out[key] = []
+        for job, items in sorted(jobs.items()):
+            means = list(report.user_means(items).values())
+            out[key].append({"job": job, "seed": job.rsplit("-seed", 1)[-1],
+                             "recall": float(np.mean(means)) if means else None})
+    return out
+
+
+def baseline_jobs(raw: Path, keys: set[tuple]) -> tuple[dict[tuple, list[dict]], dict[str, dict]]:
+    """results-v1's per-job recall for the cells in `keys`, read from its raw outputs (one folder per job), and
+    each job's load record of the store."""
+    stores_of = {(k[0], k[1]) for k in keys}
+    rows, loads = [], {}
+    for meta_path in sorted(raw.rglob("*.meta.json")):
+        name = meta_path.name.replace(".meta.json", "")
+        meta = read_json(meta_path)
+        workload, store = meta["workload"]["name"], meta["args"]["store"]
+        scored = meta_path.with_name(f"{name}.scored.jsonl.gz")
+        if (workload, store) not in stores_of or "-run-" not in name or not scored.exists():
+            continue
+        loads[name] = (meta.get("load") or {}).get("store")
+        for r in read_jsonl_gz(scored):
+            if (workload, store, r["arm"], r["layout"]) in keys:
+                rows.append({**{k: r[k] for k in KEEP if k in r}, "workload": workload, "store": store, "job": name})
+    return job_recalls(rows), loads
+
+
+def reproduction(table: list[dict], baseline: list[dict], runs: list[dict] | None = None,
+                 baseline_raw: Path | None = None) -> dict:
+    """Every cell measured at ef 100 under a name results-v1 used, beside results-v1's cell; with the raw outputs
+    of both, also each job's own recall (the registered cells pool the three jobs)."""
     old = {(c["workload"], c["store"], c["arm"], c["layout"]): c for c in baseline}
+    compared = {(c["workload"], c["store"], c["base"], c["layout"]) for c in table
+                if c["lookup"] is None and c["ef"] in (None, 100)}
+    new_jobs = job_recalls([r for r in runs or [] if parse(r["arm"])[2] is None and parse(r["arm"])[1] in (None, 100)])
+    old_jobs, old_loads = baseline_jobs(baseline_raw, compared) if baseline_raw else ({}, {})
     rows = []
     for c in table:
         if c["lookup"] is not None or c["ef"] not in (None, 100):
@@ -288,6 +329,11 @@ def reproduction(table: list[dict], baseline: list[dict]) -> dict:
             "p99_ms": {"results_v1": b["p99_ms"]["median"], "followup": c["p99_ms"]["median"]},
             "empty": {"results_v1": b["empty"], "followup": c["empty"]},
             "errors": {"results_v1": b["errors"], "followup": c["errors"]},
+            "per_job": {
+                "results_v1": [{**j, "store_load": old_loads.get(j["job"])} for j in
+                               old_jobs.get((c["workload"], c["store"], c["base"], c["layout"]), [])],
+                "followup": new_jobs.get((c["workload"], c["store"], c["arm"], c["layout"]), []),
+            },
         })
     diffs = [abs(r["difference"]) for r in rows]
     ratios = [r["p50_ms"]["followup"] / r["p50_ms"]["results_v1"] for r in rows if r["p50_ms"]["results_v1"] > 0]
@@ -438,14 +484,20 @@ def markdown(table, sweep_rows, tune, look, churn_rows, repro, jobs) -> str:  # 
         r = repro["p50_ratio"]
         lines += [f"p50 latency, follow-up over results-v1 (median over cells of each cell's ratio of job medians): "
                   f"{r['median']:.2f} (range {r['min']:.2f} to {r['max']:.2f}).", ""]
-    lines += ["Cells whose results-v1 mean lies outside the follow-up's interval:", "",
-              "| workload | store | arm | layout | results-v1 | follow-up | difference |", "|---|---|---|---|---|---|---|"]
+    def jobs_of(entries: list[dict]) -> str:
+        return ", ".join(f"{j['seed']}: {j['recall']:.3f}" for j in entries if j["recall"] is not None) or "-"
+
+    lines += ["Cells whose results-v1 mean lies outside the follow-up's interval, with each job's own recall "
+              "(seed: recall):", "",
+              "| workload | store | arm | layout | results-v1 | follow-up | difference | results-v1 jobs | "
+              "follow-up jobs |", "|---|---|---|---|---|---|---|---|---|"]
     for r in repro["outside"]:
         lo, hi = r["followup_95"]
         lines.append(f"| {r['workload']} | {r['store']} | {r['arm']} | {r['layout']} | {r['results_v1']:.3f} | "
-                     f"{r['followup']:.3f} [{lo:.3f}, {hi:.3f}] | {r['difference']:+.3f} |")
+                     f"{r['followup']:.3f} [{lo:.3f}, {hi:.3f}] | {r['difference']:+.3f} | "
+                     f"{jobs_of(r['per_job']['results_v1'])} | {jobs_of(r['per_job']['followup'])} |")
     if not repro["outside"]:
-        lines.append("| none | | | | | | |")
+        lines.append("| none | | | | | | | | |")
     lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -454,6 +506,8 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--results", type=Path, required=True)
     p.add_argument("--baseline", type=Path, required=True, help="results-v1's report folder")
+    p.add_argument("--baseline-raw", type=Path, default=None,
+                   help="results-v1's raw outputs (one folder per job), for each job's own recall in the check")
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--resamples", type=int, default=10_000)
     p.add_argument("--seed", type=int, default=5)
@@ -469,7 +523,7 @@ def main() -> None:
     tune = tunability(sweep_rows, h6)
     look = lookups(runs, table)
     churn_rows = churn_summary(churn, baseline_churn)
-    repro = reproduction(table, baseline_cells)
+    repro = reproduction(table, baseline_cells, runs, args.baseline_raw)
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
     write_json(out / "cells.json", table)

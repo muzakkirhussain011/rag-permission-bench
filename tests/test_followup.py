@@ -281,12 +281,23 @@ def test_the_report_runs_on_folders_laid_out_as_the_jobs_leave_them(tmp_path, mo
     write_json(base / "hypotheses.json", {"H6": {"parts": [{"store": "pgvector", "layout": "w3_s0p01_neg",
                                                             "interval": [0.287, 0.36]}]}})
     out = tmp_path / "report"
+    raw = tmp_path / "v1raw"
+    for seed, recall in ((1, 0.5), (2, 0.7)):
+        v1job = f"measured-run-w3-s0p01-pgvector-seed{seed}"
+        write_json(raw / v1job / f"{v1job}.meta.json", {"args": {"store": "pgvector"}, "workload": {"name": "w3"},
+                                                         "load": {"store": {"segments": 3}}})
+        write_jsonl_gz(raw / v1job / f"{v1job}.scored.jsonl.gz",
+                       [_scored("a4@default", f"u{u}", recall) for u in range(5)] + [_scored("a4@iterative", "u0", 1.0)])
     monkeypatch.setattr(sys, "argv", ["followup", "--results", str(results), "--baseline", str(base), "--out", str(out),
-                                      "--resamples", "200"])
+                                      "--resamples", "200", "--baseline-raw", str(raw)])
     followup.main()
     repro = json.loads((out / "reproduction.json").read_text())
     assert repro["cells"] == 2 and repro["inside"] == 1
     assert [r["arm"] for r in repro["outside"]] == ["a4@default"]
+    jobs = repro["outside"][0]["per_job"]
+    assert [(j["seed"], j["recall"]) for j in jobs["results_v1"]] == [("1", 0.5), ("2", 0.7)]
+    assert jobs["results_v1"][0]["store_load"] == {"segments": 3}
+    assert [(j["seed"], j["recall"]) for j in jobs["followup"]] == [("1", 0.8)]
     tune = json.loads((out / "tunability.json").read_text())
     assert tune[0]["highest"]["arm"] == "a4@default:ef400" and tune[0]["h6_results_v1"] == [0.287, 0.36]
     look = json.loads((out / "lookup.json").read_text())

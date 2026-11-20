@@ -1,9 +1,10 @@
 name: followup-report
 
 # The report of the follow-up runs (prereg/addendum-1.md): collect the newest artifact of every follow-up
-# job, check release results-v1's report against its checksums, and run bench.followup, which compares the
-# runs at ef 100 with results-v1 and makes the tables the addendum names (section 6). With `publish`, the
-# raw outputs and the report become a release, as report.yml did for results-v1.
+# job, check release results-v1's report and raw outputs against their checksums, and run bench.followup,
+# which compares the runs at ef 100 with results-v1 (each job's own recall too) and makes the tables the
+# addendum names (section 6). With `publish`, the raw outputs and the report become a release, as
+# report.yml did for results-v1.
 
 on:
   workflow_dispatch:
@@ -52,15 +53,18 @@ jobs:
             rm a.zip
           done < collected.tsv
           echo "collected $(wc -l < collected.tsv) artifacts"
-      - name: Fetch results-v1's report
+      - name: Fetch results-v1's report and raw outputs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p results-v1 && cd results-v1
-          gh release download results-v1 -p report.tar.gz -p SHA256SUMS
-          sha256sum -c SHA256SUMS --ignore-missing
+          mkdir -p results-v1/raw && cd results-v1
+          gh release download results-v1 -p report.tar.gz -p results-raw.tar.gz -p SHA256SUMS
+          sha256sum -c SHA256SUMS
           tar xzf report.tar.gz
-      - run: python -m bench.followup --results artifacts --baseline results-v1/report --out report
+          tar xzf results-raw.tar.gz -C raw && rm results-raw.tar.gz
+      - run: >-
+          python -m bench.followup --results artifacts --baseline results-v1/report
+          --baseline-raw results-v1/raw/artifacts --out report
       - name: Bundle
         run: |
           cp collected.tsv report/
