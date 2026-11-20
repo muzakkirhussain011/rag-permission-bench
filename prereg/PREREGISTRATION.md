@@ -220,4 +220,7 @@ paper. Cells that cannot run (for example a store that cannot take an arm) are r
 
 ## Amendments
 
-None yet.
+- 2026-11-20: [Addendum 1](addendum-1.md) adds exploratory follow-up runs (search breadth, the cost of looking
+  up a user's principals, p99 per job, and a diagnostic of the change protocol), registered before any of them
+  ran, after an internal review of the paper draft. It changes nothing above: H1 to H8, their judging rules and
+  the analysis of the measured jobs stand as deposited.
