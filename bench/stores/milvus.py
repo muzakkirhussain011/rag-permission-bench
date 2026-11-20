@@ -27,6 +27,10 @@ class Milvus:
 
     def __init__(self) -> None:
         self.client = None
+        self.ef = EF_SEARCH
+
+    def set_ef(self, ef: int) -> None:
+        self.ef = ef
 
     def _client(self):  # noqa: ANN202
         from pymilvus import MilvusClient
@@ -84,7 +88,7 @@ class Milvus:
         ids: list[int] | None = None,
         setting: str = "default",
     ) -> list[tuple[int, float]]:
-        params: dict = {"params": {"ef": max(EF_SEARCH, k)}}
+        params: dict = {"params": {"ef": max(self.ef, k)}}
         if setting == "iterative":
             params["hints"] = "iterative_filter"
         expression, values = "", {}

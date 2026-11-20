@@ -170,8 +170,9 @@ def load_openfga(w: Workload) -> dict:
 # ---- permission changes (bench.churn) ------------------------------------------------------------
 
 
-def spicedb_change(client, touch: list[Tuple], delete: list[Tuple]) -> None:  # noqa: ANN001
-    """One WriteRelationships call; returns when SpiceDB has acknowledged it."""
+def spicedb_change(client, touch: list[Tuple], delete: list[Tuple]) -> str | None:  # noqa: ANN001
+    """One WriteRelationships call; returns when SpiceDB has acknowledged it, with the ZedToken of the
+    write (which the change diagnostic's `at_least_as_fresh` reads ask for)."""
     from authzed.api.v1 import RelationshipUpdate, WriteRelationshipsRequest
 
     updates = [RelationshipUpdate(operation=RelationshipUpdate.Operation.OPERATION_TOUCH, relationship=_relationship(t))
@@ -179,7 +180,8 @@ def spicedb_change(client, touch: list[Tuple], delete: list[Tuple]) -> None:  # 
     updates += [RelationshipUpdate(operation=RelationshipUpdate.Operation.OPERATION_DELETE,
                                    relationship=_relationship(t)) for t in delete]
     if updates:
-        client.WriteRelationships(WriteRelationshipsRequest(updates=updates))
+        return client.WriteRelationships(WriteRelationshipsRequest(updates=updates)).written_at.token
+    return None
 
 
 def openfga_change(fga: dict, write: list[Tuple], delete: list[Tuple]) -> None:

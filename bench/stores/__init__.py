@@ -12,6 +12,9 @@ ef = 100, so that stores differ in how they filter, not in index breadth.
 
 `setting` picks the store's filter mode: `default` is what the store does unless told otherwise;
 the other names are the store's documented alternatives.
+
+`set_ef(ef)` changes the search breadth for the searches that follow (the follow-up runs of
+`prereg/addendum-1.md` sweep it); a store starts at `EF_SEARCH`, and nothing else changes it.
 """
 
 from __future__ import annotations

@@ -21,6 +21,9 @@ from .metrics import score
 from .util import read_jsonl_gz, write_json, write_jsonl_gz
 from .workload import Workload
 
+# What a follow-up lookup arm records beside its latency (bench.arms._with_lookup); passed on unscored.
+LOOKUP_FIELDS = ("lookup_ms", "search_ms", "groups_found", "principals_match")
+
 
 def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], list[str], list[dict]]:
     masks: dict[tuple[str, str], np.ndarray] = {}
@@ -40,11 +43,14 @@ def summarize(w: Workload, rows: list[dict], truth: dict) -> tuple[list[dict], l
         scored.append({"arm": row["arm"], "layout": row["layout"], "user": row["user"], "q": row["q"],
                        "kind": kinds[row["layout"]].get(f"{row['user']}|{row['q']}"), "ms": row["ms"],
                        "error": row["error"], "n_readable": t["n_readable"], "sigma_g": t["sigma_g"],
-                       "rho": t["rho"], **s})
+                       "rho": t["rho"], **s,
+                       **{k: row[k] for k in LOOKUP_FIELDS if k in row}})  # follow-up lookup arms only
         if row["arm"] == "a0" and row["error"] is None and t["n_readable"] > 0 and s["recall"] != 1.0:
             problems.append(f"a0 recall {s['recall']} on {key} q{row['q']}")
         if row["arm"] == "a0" and s["outside"]:
             problems.append(f"a0 returned {s['outside']} unreadable chunks on {key} q{row['q']}")
+        if row.get("principals_match") is False:
+            problems.append(f"{row['arm']} looked up other groups than the harness's on {key} q{row['q']}")
     out = []
     for (arm, layout), items in sorted(cells.items()):
         per_user: dict[str, list[float]] = defaultdict(list)

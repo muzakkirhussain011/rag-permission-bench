@@ -20,7 +20,9 @@ The measured runs are finished and analysed.
 - Supplementary analyses of `results-v1` (section 4 below), outside the registered analysis, are in
   [`reports/extras-results-v1/`](reports/extras-results-v1/README.md).
 - Exploratory follow-up runs, asked for by an internal review of the paper draft, are registered in
-  [`prereg/addendum-1.md`](prereg/addendum-1.md) (release `prereg-addendum-1`), written before any of them ran.
+  [`prereg/addendum-1.md`](prereg/addendum-1.md) (release `prereg-addendum-1`,
+  [doi:10.5281/zenodo.24406063](https://doi.org/10.5281/zenodo.24406063)), written before any of them ran
+  (section 5 below).
 
 ## What is compared
 
@@ -46,6 +48,7 @@ pre-registration, section 4.
 | Release | Files | Archived elsewhere |
 |---|---|---|
 | `prereg-v1` | none besides the source: the harness and the pre-registration as deposited | Zenodo [10.5281/zenodo.24026269](https://doi.org/10.5281/zenodo.24026269), the repository's source zip |
+| `prereg-addendum-1` | none besides the source: the addendum registering the follow-up runs, before any of them ran | Zenodo [10.5281/zenodo.24406063](https://doi.org/10.5281/zenodo.24406063), the repository's source zip |
 | `data-msmarco-v1` | `vectors.npy` (1,000,000 passage vectors, 384 dimensions), `queries.npy` and `questions.json` (300 dev questions), `passages.json.gz` (BEIR passage ids in order), `corpus-meta.json`, `w3-workload.tar.gz`, four `w2_*-workload.tar.gz`, `SHA256SUMS` | no |
 | `data-enron-v2` | `w1-vectors.npy`, `w1-queries.npy`, `w1-workload.tar.gz`, `SHA256SUMS` | no |
 | `results-v1` | `results-raw.tar.gz` (254,808,407 bytes), `report.tar.gz`, `SHA256SUMS` (both archives) | Zenodo [10.5281/zenodo.24055691](https://doi.org/10.5281/zenodo.24055691) holds the repository's source zip at the tag `results-v1`, not these three files |
@@ -166,6 +169,27 @@ recorded them, and what was not recorded; (c) an exploratory sensitivity analysi
 to H8 with questions resampled as clusters. None of it is the registered analysis. The outputs are the artifact
 `extras`; those of run 43465687888 (commit `1260760`, 10,000 resamples) are committed in
 [`reports/extras-results-v1/`](reports/extras-results-v1/README.md).
+
+### 5. Follow-up runs (exploratory)
+
+[`prereg/addendum-1.md`](prereg/addendum-1.md) registers 66 more jobs: each store's filter and the post-filters at
+ef 40, 100 and 400 on W3 shares 0.01 and 0.05 (`plan=sweep`, five stores) and pgvector with `hnsw.max_scan_tuples`
+raised (`plan=wide`); one lookup of the user's groups in SpiceDB or OpenFGA per query for the arms that receive
+them from the harness (`+lookup-<engine>` arms in the sweep jobs, and `plan=lookup` on W1, W2 and the other W3
+shares, pgvector); and a change diagnostic (`plan=diag-a`, `diag-b`, pgvector) that runs the registered change
+protocol beside one with the same pause before every change, with SpiceDB's `at_least_as_fresh` and
+`fully_consistent` reads. Arm names carry the setting: `a4@iterative:ef400`, `a4@default:ef100+lookup-spicedb`.
+
+```bash
+gh workflow run followup.yml -f seeds=1,2,3            # the 66 jobs, at most twelve at a time
+gh workflow run followup-report.yml -f prefix=followup-  # bench.followup, with the check against results-v1
+gh workflow run cell.yml -f workload=w3 -f store=qdrant -f kind=run -f plan=sweep \
+  -f layouts=w3_s0p05_neg,w3_s0p05_none,w3_s0p05_pos -f seed=1 -f label=followup   # one job
+```
+
+Outside Actions, `python -m bench.run ... --plan sweep` and `python -m bench.churn ... --plan diag-a` run the same
+jobs; `python -m bench.followup --results artifacts --baseline <results-v1 report> --out report` makes the report
+(`report/followup.md` presents it).
 
 ### Check the harness on synthetic data
 

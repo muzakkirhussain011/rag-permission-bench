@@ -8,6 +8,11 @@ gets `--warmup` unrecorded queries first, drawn from its own pairs (A0 and A3 an
 subset, `arm_pairs`). Every answer is written raw (hit ids, scores, latency,
 error); scoring is a separate step (`bench.analyze`). A `.meta.json` beside the output records
 versions, images, machine, load timings, probes and, on pgvector, executed plans.
+
+The follow-up runs (`prereg/addendum-1.md`) add `--plan sweep|wide|lookup`, which picks the job's
+arms (`arms.plan_names`), and `--budget-s`, after which no new query starts. An arm named with
+`:ef<N>` runs at that search breadth; in a job with such arms, every other arm runs at `EF_SEARCH`.
+A lookup arm's rows add the lookup's and the search's time. Without these options a run is as before.
 """
 
 from __future__ import annotations
@@ -120,12 +125,22 @@ def arm_pairs(name: str, pairs: list[tuple], seed: int) -> list[tuple]:
 
 
 async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int, warmup: int,
-                  checkpoint=None) -> list[dict]:  # noqa: ANN001
+                  checkpoint=None, budget_s: float = 0, status: dict | None = None) -> list[dict]:  # noqa: ANN001
     rng = random.Random(seed)
     order = list(names)
     rng.shuffle(order)
     rows: list[dict] = []
+    breadth = any(arms.parse(name)[1] is not None for name in names)  # a follow-up job sets ef per arm
+    deadline = time.monotonic() + budget_s if budget_s else None
+    status = status if status is not None else {}
+    status.update(stopped_at_budget=False, arms_not_started=[], arm_cut_short=None)
     for name in order:
+        if deadline is not None and time.monotonic() > deadline:
+            status["stopped_at_budget"] = True
+            status["arms_not_started"].append(name)
+            continue
+        if breadth:
+            ctx.store.set_ef(arms.parse(name)[1] or stores.EF_SEARCH)
         run = arms.build(name, ctx)
         own = arm_pairs(name, pairs, seed)
         if hasattr(run, "prepare"):  # per-user retrievers are built before any query is timed
@@ -139,7 +154,11 @@ async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int,
         rng.shuffle(sequence)
         started = time.perf_counter()
         errors = 0
+        done = 0
         for layout, user, q in sequence:
+            if deadline is not None and time.monotonic() > deadline:
+                status.update(stopped_at_budget=True, arm_cut_short=name, arm_cut_short_queries=done)
+                break
             groups = layout.user_groups.get(user, [])
             t0 = time.perf_counter_ns()
             try:
@@ -148,12 +167,17 @@ async def measure(ctx: Context, names: list[str], pairs: list[tuple], seed: int,
                 hits, error = [], f"{type(e).__name__}: {e}"[:300]
                 errors += 1
             t1 = time.perf_counter_ns()
-            rows.append({
+            row = {
                 "arm": name, "layout": layout.name, "user": user, "q": q,
                 "hits": [h[0] for h in hits], "scores": [round(h[1], 6) for h in hits],
                 "ms": (t1 - t0) / 1e6, "error": error,
-            })
-        log(f"{name}: {len(sequence)} queries in {time.perf_counter() - started:.0f} s, {errors} errors")
+            }
+            extra = getattr(run, "extra", None)  # lookup arms: the lookup's and the search's time
+            if extra:
+                row.update(extra)
+            rows.append(row)
+            done += 1
+        log(f"{name}: {done} of {len(sequence)} queries in {time.perf_counter() - started:.0f} s, {errors} errors")
         if checkpoint is not None:  # a job stopped by its time limit keeps every finished arm
             checkpoint(rows)
     return rows
@@ -178,6 +202,31 @@ def explain_samples(ctx: Context, pairs: list[tuple]) -> list[dict]:
     return plans
 
 
+def explain_breadth(ctx: Context, pairs: list[tuple], names: list[str]) -> list[dict]:
+    """Follow-up jobs: one executed plan per layout for the exact scan, and for every A4 setting and
+    A5 setting at every search breadth the job ran it at (`a4@<setting>:ef<N>`)."""
+    combos = sorted({(base, ef) for base, ef, lookup in map(arms.parse, names)
+                     if ef is not None and lookup is None and base.startswith(("a4@", "a5-rls@"))})
+    plans = []
+    seen = set()
+    for layout, user, q in pairs:
+        if layout.name in seen:
+            continue
+        seen.add(layout.name)
+        p = principals(user, layout.user_groups.get(user, []))
+        vector = ctx.vector(f"q{q}")
+        ctx.store.set_ef(stores.EF_SEARCH)
+        plans.append({"layout": layout.name, "arm": "a4@exact",
+                      "plan": ctx.store.explain(vector, arms.K, principals=p, setting="exact")})
+        for base, ef in combos:
+            ctx.store.set_ef(ef)
+            arm, _, setting = base.partition("@")
+            plans.append({"layout": layout.name, "arm": f"{base}:ef{ef}", "ef": ef,
+                          "plan": ctx.store.explain(vector, arms.K, principals=p, setting=setting,
+                                                    rls=arm == "a5-rls")})
+    return plans
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--workload", type=Path, required=True)
@@ -190,6 +239,9 @@ def main() -> None:
     p.add_argument("--settle", type=float, default=10.0, help="seconds between loading and the first query")
     p.add_argument("--partitions", action="store_true", help="also build per-principal partitions (arm A6, pgvector)")
     p.add_argument("--pairs-per-layout", type=int, default=0, help="sample this many pairs per layout (0: all)")
+    p.add_argument("--plan", default="", choices=["", "sweep", "wide", "lookup"],
+                   help="a follow-up job's arms (prereg/addendum-1.md); empty: every arm, as registered")
+    p.add_argument("--budget-s", type=float, default=0, help="start no query after this many seconds (0: no limit)")
     args = p.parse_args()
 
     meta: dict = {"args": {k: str(v) for k, v in vars(args).items()}, "environment": environment()}
@@ -212,7 +264,8 @@ def main() -> None:
         if args.pairs_per_layout:
             chosen = sampler.sample(chosen, min(args.pairs_per_layout, len(chosen)))
         pairs += chosen
-    names = [a for a in args.arms.split(",") if a] or arms.names(store)
+    names = ([a for a in args.arms.split(",") if a] or (arms.plan_names(store, args.plan) if args.plan else [])
+             or arms.names(store))
     meta["arms"] = names
     meta["pairs"] = len(pairs)
     layout, user, q = pairs[0]
@@ -221,11 +274,16 @@ def main() -> None:
     meta_path = args.out.with_name(args.out.name.replace(".jsonl.gz", ".meta.json"))
     meta["complete"] = False
     write_json(meta_path, meta)
+    status: dict = {}
     rows = asyncio.run(measure(ctx, names, pairs, args.seed, args.warmup,
-                               checkpoint=lambda done: write_jsonl_gz(args.out, done)))
+                               checkpoint=lambda done: write_jsonl_gz(args.out, done), budget_s=args.budget_s,
+                               status=status))
     meta["complete"] = True
+    if args.plan or args.budget_s:
+        meta["status"] = status
     if store.name == "pgvector":
-        meta["plans"] = explain_samples(ctx, pairs)
+        breadth = any(arms.parse(name)[1] is not None for name in names)
+        meta["plans"] = explain_breadth(ctx, pairs, names) if breadth else explain_samples(ctx, pairs)
     if hasattr(store, "strategy"):
         meta["filter_strategy_at_end"] = store.strategy()
     stats = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}"], capture_output=True, text=True)
