@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\caption{The controlled sweep (W3) by readable share, summarizing Figures~\ref{fig:w3-recall} and \ref{fig:w3-p50}: which stores' own filters (A4) recalled 1.000 (to three decimals) in all three folder orders, and their latency, or else the store filter whose lowest recall over the orders was highest; the store filter with the lowest recall; the exact control's latency (A0, pgvector, one question per user, so over a subset of the questions the other arms answered); and the highest recall of any post-filter (A1, A2). Latency is p50 / p99, each computed per job and then the median over the three jobs, in ms unless marked; ranges span the three folder orders and the stores named.}
+\label{tab:regimes}
+\footnotesize
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}Xlll@{}}
+\toprule
+Share & A4 recalling 1.000 in every folder order (p50 / p99) & Lowest A4 recall & A0 p50 / p99 & Best post-filter recall \\
+\midrule
+0.001 & Qdrant (both), Milvus (default), Weaviate (both), OpenSearch (1.0--3.2 / 1.5--4.9) & 0.930 (pgvector, default) & 2.0--3.7 / 5.1--7.2 & 0.027 \\
+0.01 & Milvus (default), Weaviate (both), OpenSearch (2.8--6.3 / 5.6--9.3) & 0.003 (pgvector, default) & 11.2--14.0 / 15.5--24.9 & 0.187 \\
+0.05 & Milvus (default), OpenSearch (8.3--10.0 / 11.4--20.7) & 0.030 (pgvector, default) & 72.9--76.7 / 93.0--99.5 & 0.505 \\
+0.2 & none; best 0.949 (Milvus, default; 3.6--5.6 / 6.2--11.9) & 0.206 (pgvector, default) & 1.8\,s--2.6\,s / 1.9\,s--2.7\,s & 0.817 \\
+0.5 & none; best 0.959 (OpenSearch, default; 15.2--15.4 / 36.7--42.4) & 0.593 (pgvector, default) & 2.8\,s--3.4\,s / 2.9\,s--3.5\,s & 0.949 \\
+\bottomrule
+\end{tabularx}
+\end{table*}
