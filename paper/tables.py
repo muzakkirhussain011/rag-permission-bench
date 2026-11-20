@@ -115,8 +115,9 @@ def detail(k, v):
 
 
 lines = [r"\begin{table}[t]", r"\caption{The pre-registered hypotheses and their verdicts, each judged on a 99.375\% interval "
-         r"(Bonferroni over eight) by the registered rule; a hypothesis over several cells is supported only if it is "
-         r"supported in every cell.}", r"\label{tab:hypotheses}", r"\footnotesize\setlength{\tabcolsep}{4pt}",
+         r"(Bonferroni over eight) by the registered rule; a hypothesis with several parts (cells, or pairs of cells "
+         r"it compares) is supported only if it is supported in every part.}", r"\label{tab:hypotheses}",
+         r"\footnotesize\setlength{\tabcolsep}{4pt}",
          r"\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{1.3cm}"
          r">{\raggedright\arraybackslash}p{2.6cm}@{}}",
          r"\toprule", r"& Prediction & Verdict & Evidence \\", r"\midrule"]

@@ -628,7 +628,8 @@ def md_index(meta: dict, parts: dict) -> str:
             "| `pairs.md`, `pairs.json` | (g) A3 and A4 on the same pairs; Qdrant's settings on the same queries |",
             "| `churn-faults.md`, `churn-faults.json` | (h) the change and fault runs' layouts, pairs and probes |",
             "| `order.md`, `order.json` | (i) arm order and latency |",
-            "| `figures/` | the paper's figures, drawn by `bench.figures` at this commit from the rebuilt report |", "",
+            "| `figures/` | the paper's figures, drawn by `bench.figures` at this commit from the published report (which "
+            "`reports/extras-results-v1/rebuild.json` found identical to the one rebuilt from the raw outputs) |", "",
             "## In brief", ""]
     for s in parts["model"]["summary"]:
         out.append(f"- Model, {s['workload']} {s['arms']} {s['kind'] or 'all'}: measured minus predicted from "

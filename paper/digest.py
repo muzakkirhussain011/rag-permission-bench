@@ -125,6 +125,13 @@ for key, title in (("p50_ms", "p50"), ("p99_ms", "p99")):
                 line.append(f"{st}: " + " / ".join(vals))
         w(f"- {arm}: " + "; ".join(line))
     w("")
+w("## W3: p50 and p99 latency (ms, median over jobs), lowest and highest cell per arm\n")
+for arm in arms:
+    cs = [c for c in w3 if c["arm"] == arm]
+    lo50, hi50 = min(c["p50_ms"]["median"] for c in cs), max(c["p50_ms"]["median"] for c in cs)
+    lo99, hi99 = min(c["p99_ms"]["median"] for c in cs), max(c["p99_ms"]["median"] for c in cs)
+    w(f"- {arm}: p50 {lo50:.1f} to {hi50:.1f}; p99 {lo99:.1f} to {hi99:.1f} ({len(cs)} cells)")
+w("")
 w("## W3: per-job p50 latency (ms), fastest and slowest job, for A0, A3 and A4, by store and layout\n")
 for c in sorted(w3, key=lambda c: (c["arm"], STORES.index(c["store"]), c["layout"])):
     if c["arm"] == "a0" or c["arm"].startswith(("a3", "a4")):

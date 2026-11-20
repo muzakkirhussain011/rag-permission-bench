@@ -6,7 +6,7 @@ sums, counts, minima, maxima and medians over its cells. Every recall, interval 
 
 | script | writes |
 |---|---|
-| `tables.py` | `tab-quality.tex` (recall@10 on W1 and W2 per arm, range over stores), `tab-hypotheses.tex` (H1 to H8 and their verdicts), `tab-faults.tex` (errors and empty answers under engine faults), `tab-regimes.tex` (the W3 sweep summarized by readable share), `numbers.tex` (macros for the counts the text quotes) |
+| `tables.py` | `tab-quality.tex` (recall@10 on W1 and W2 per arm: a range over stores, and one row per store and setting for the store filter and wardowl), `tab-hypotheses.tex` (H1 to H8 and their verdicts), `tab-faults.tex` (errors and empty answers under engine faults), `tab-regimes.tex` (the W3 sweep summarized by readable share, with p50 and p99 latency), `numbers.tex` (macros for the counts the text quotes) |
 | `digest.py` | a Markdown digest of every cell, hypothesis part, change delay and fault count, from which the text's numbers were taken |
 
 The figures are made by `bench.figures` (see the main README). The paper's text is not part of this repository.
@@ -26,4 +26,4 @@ python paper/digest.py report > paper-tables/digest.md
 ```
 
 The `extras` workflow (`.github/workflows/extras.yml`) runs the last two commands on the published report and keeps
-their output in its artifact. `tests/test_paper.py` runs both scripts on a made-up report in CI.
+their output in its artifacts (`extras`, and `extras-v1b` with the figures; see `reports/extras-results-v1b`). `tests/test_paper.py` runs both scripts on a made-up report in CI.
