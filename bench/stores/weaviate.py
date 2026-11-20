@@ -3,7 +3,8 @@
 Settings: `default` is ACORN, the filter strategy Weaviate 1.40 uses unless told otherwise (set
 explicitly so a change of server default cannot slip in); `pathseer` switches the collection to
 PathSeer, added in 1.40. The strategy is a mutable index setting, so the run switches it between
-arms; the strategy in force is read back and recorded.
+arms; the strategy in force is read back and recorded. `ef` is a mutable index setting too: `set_ef`
+changes it and waits until the collection reports the new value.
 Chunks get UUIDs derived from their ids; an id filter is a filter on those UUIDs.
 """
 
@@ -35,6 +36,7 @@ class Weaviate:
         self.client = None
         self.collection = None
         self.setting = None
+        self.ef = EF_SEARCH  # the collection is created with it
 
     def _connect(self):  # noqa: ANN202
         import weaviate
@@ -102,6 +104,19 @@ class Weaviate:
                 raise RuntimeError(f"Weaviate did not switch to {strategy}")
             time.sleep(0.5)
         self.setting = setting
+
+    def set_ef(self, ef: int) -> None:
+        from weaviate.classes.config import Reconfigure
+
+        if ef == self.ef:
+            return
+        self.collection.config.update(vector_index_config=Reconfigure.VectorIndex.hnsw(ef=int(ef)))
+        deadline = time.monotonic() + 60
+        while self.collection.config.get().vector_index_config.ef != ef:
+            if time.monotonic() > deadline:
+                raise RuntimeError(f"Weaviate did not switch to ef {ef}")
+            time.sleep(0.5)
+        self.ef = ef
 
     def search(
         self,

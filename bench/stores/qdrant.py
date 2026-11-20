@@ -26,6 +26,10 @@ class Qdrant:
 
     def __init__(self) -> None:
         self.client = None
+        self.ef = EF_SEARCH
+
+    def set_ef(self, ef: int) -> None:
+        self.ef = ef
 
     def _client(self):  # noqa: ANN202
         from qdrant_client import QdrantClient
@@ -102,9 +106,9 @@ class Qdrant:
             conditions.append(models.FieldCondition(key="principals", match=models.MatchAny(any=principals)))
         elif ids is not None:
             conditions.append(models.HasIdCondition(has_id=ids))
-        params = models.SearchParams(hnsw_ef=EF_SEARCH)
+        params = models.SearchParams(hnsw_ef=self.ef)
         if setting == "acorn":
-            params = models.SearchParams(hnsw_ef=EF_SEARCH, acorn=models.AcornSearchParams(enable=True))
+            params = models.SearchParams(hnsw_ef=self.ef, acorn=models.AcornSearchParams(enable=True))
         response = self.client.query_points(
             COLLECTION,
             query=np.asarray(q, dtype=np.float32).tolist(),

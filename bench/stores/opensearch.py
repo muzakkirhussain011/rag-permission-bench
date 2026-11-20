@@ -33,8 +33,8 @@ def _client(auth: tuple[str, str] = ADMIN, timeout: int = 60):  # noqa: ANN202
                       ssl_show_warn=False, timeout=timeout)
 
 
-def _body(q: np.ndarray, k: int, where: dict | None) -> dict:
-    knn: dict = {"vector": np.asarray(q, dtype=np.float32).tolist(), "k": k, "method_parameters": {"ef_search": EF_SEARCH}}
+def _body(q: np.ndarray, k: int, where: dict | None, ef: int = EF_SEARCH) -> dict:
+    knn: dict = {"vector": np.asarray(q, dtype=np.float32).tolist(), "k": k, "method_parameters": {"ef_search": ef}}
     if where is not None:
         knn["filter"] = where
     return {"size": k, "_source": False, "query": {"knn": {"embedding": knn}}}
@@ -47,6 +47,10 @@ class OpenSearch:
     def __init__(self) -> None:
         self.client = None
         self.readers: dict = {}
+        self.ef = EF_SEARCH
+
+    def set_ef(self, ef: int) -> None:
+        self.ef = ef
 
     def load(self, w: Workload) -> dict:
         from opensearchpy import helpers
@@ -133,13 +137,13 @@ class OpenSearch:
             where = {"terms": {"principals": principals}}
         elif ids is not None:
             where = {"ids": {"values": [str(i) for i in ids]}}
-        result = self.client.search(index=INDEX, body=_body(q, k, where), request_timeout=CALL_LIMIT_S)
+        result = self.client.search(index=INDEX, body=_body(q, k, where, self.ef), request_timeout=CALL_LIMIT_S)
         return [(int(h["_id"]), float(h["_score"])) for h in result["hits"]["hits"]]
 
     def search_dls(self, q: np.ndarray, k: int, user: str) -> list[tuple[int, float]]:
         if user not in self.readers:
             self.readers[user] = _client((user, READER_PASSWORD))
-        result = self.readers[user].search(index=INDEX, body=_body(q, k, None), request_timeout=CALL_LIMIT_S)
+        result = self.readers[user].search(index=INDEX, body=_body(q, k, None, self.ef), request_timeout=CALL_LIMIT_S)
         return [(int(h["_id"]), float(h["_score"])) for h in result["hits"]["hits"]]
 
     def set_principals(self, i: int, principals: list[str], vector: np.ndarray) -> None:

@@ -1,0 +1,83 @@
+name: followup-report
+
+# The report of the follow-up runs (prereg/addendum-1.md): collect the newest artifact of every follow-up
+# job, check release results-v1's report against its checksums, and run bench.followup, which compares the
+# runs at ef 100 with results-v1 and makes the tables the addendum names (section 6). With `publish`, the
+# raw outputs and the report become a release, as report.yml did for results-v1.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prefix:
+        description: collect artifacts whose name starts with this
+        default: followup-
+      publish:
+        description: also publish a release with the raw outputs and the report (tag below)
+        type: boolean
+        default: false
+      tag:
+        description: release tag when publishing
+        default: followup-v1
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write  # only used with publish
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt -r requirements-report.txt
+      - name: Collect the follow-up jobs' outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFIX: ${{ inputs.prefix }}
+        run: |
+          mkdir -p artifacts
+          # Newest artifact per name: a job re-run after an infrastructure failure replaces its earlier attempt.
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith($ENV.PREFIX)) | [.id, .name, .workflow_run.id, .created_at] | @tsv' \
+            | sort -t$'\t' -k2,2 -k1,1nr | awk -F'\t' '!seen[$2]++' > collected.tsv
+          while IFS=$'\t' read -r id name run created; do
+            gh api "repos/${{ github.repository }}/actions/artifacts/$id/zip" > a.zip
+            unzip -q -o a.zip -d "artifacts/$name" -x compose.log
+            rm a.zip
+          done < collected.tsv
+          echo "collected $(wc -l < collected.tsv) artifacts"
+      - name: Fetch results-v1's report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p results-v1 && cd results-v1
+          gh release download results-v1 -p report.tar.gz -p SHA256SUMS
+          sha256sum -c SHA256SUMS --ignore-missing
+          tar xzf report.tar.gz
+      - run: python -m bench.followup --results artifacts --baseline results-v1/report --out report
+      - name: Bundle
+        run: |
+          cp collected.tsv report/
+          tar czf results-raw.tar.gz artifacts
+          tar czf report.tar.gz report
+          sha256sum results-raw.tar.gz report.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-followup  # not "followup-...", which the collection step picks up
+          path: |
+            report/
+            SHA256SUMS
+      - if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.tag }}" results-raw.tar.gz report.tar.gz SHA256SUMS \
+            --title "Follow-up results (${{ inputs.tag }})" --target "${{ github.sha }}" --latest=false \
+            --notes "Exploratory follow-up runs registered in prereg/addendum-1.md (release prereg-addendum-1) before any of them ran: the raw outputs of every follow-up job (report/collected.tsv lists them, with their workflow runs) and the report bench.followup made from them at this commit (report/followup.md presents it)."

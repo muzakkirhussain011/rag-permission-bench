@@ -1,0 +1,80 @@
+name: followup
+
+# The exploratory follow-up runs registered in prereg/addendum-1.md (release prereg-addendum-1), written
+# before any of them ran: search breadth (sweep, wide), principal lookups (lookup) and the change
+# diagnostic (diag-a, diag-b), seeds 1 to 3, at most twelve jobs at a time. Each job is one call of
+# cell.yml with label `followup`; followup-report.yml analyses their outputs (bench.followup).
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: comma-separated seeds
+        default: "1,2,3"
+      only:
+        description: optional filter on plan, workload, store or share, e.g. "sweep" or "s0p01" (empty = every job)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          SEEDS: ${{ inputs.seeds }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          stores = ["pgvector", "qdrant", "milvus", "weaviate", "opensearch"]
+          def w3(share):
+              return ",".join(f"w3_s{share}_{c}" for c in ("neg", "none", "pos"))
+          cells = []
+          for seed in [s.strip() for s in os.environ["SEEDS"].split(",") if s.strip()]:
+              # Longest or least predictable first.
+              for share in ("0p01", "0p05"):
+                  cells.append({"plan": "wide", "kind": "run", "workload": "w3", "store": "pgvector",
+                                "layouts": w3(share), "seed": seed, "part": f"s{share}"})
+              for plan in ("diag-a", "diag-b"):
+                  cells.append({"plan": plan, "kind": "churn", "workload": "w3", "store": "pgvector", "layouts": "",
+                                "seed": seed, "part": ""})
+              for store in stores:
+                  for share in ("0p01", "0p05"):
+                      cells.append({"plan": "sweep", "kind": "run", "workload": "w3", "store": store,
+                                    "layouts": w3(share), "seed": seed, "part": f"s{share}"})
+              for share in ("0p5", "0p2", "0p001"):
+                  cells.append({"plan": "lookup", "kind": "run", "workload": "w3", "store": "pgvector",
+                                "layouts": w3(share), "seed": seed, "part": f"s{share}"})
+              for w in ("w1", "w2_tree_a", "w2_uniform_a", "w2_erbac_a", "w2_erbac_b"):
+                  cells.append({"plan": "lookup", "kind": "run", "workload": w, "store": "pgvector", "layouts": "",
+                                "seed": seed, "part": ""})
+          only = os.environ["ONLY"].strip()
+          if only:
+              cells = [c for c in cells if only in (c["plan"], c["workload"], c["store"], c["part"])]
+          print(len(cells), "jobs")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("matrix=" + json.dumps({"include": cells}) + "\n")
+          EOF
+
+  cell:
+    needs: plan
+    name: ${{ matrix.plan }} ${{ matrix.workload }} ${{ matrix.part }} ${{ matrix.store }} seed ${{ matrix.seed }}
+    strategy:
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      max-parallel: 12
+      fail-fast: false
+    uses: ./.github/workflows/cell.yml
+    with:
+      workload: ${{ matrix.workload }}
+      store: ${{ matrix.store }}
+      kind: ${{ matrix.kind }}
+      layouts: ${{ matrix.layouts }}
+      seed: ${{ matrix.seed }}
+      pairs: "0"
+      label: followup
+      plan: ${{ matrix.plan }}

@@ -3,6 +3,10 @@
 Settings: `default` leaves `hnsw.iterative_scan` off (pgvector's default: the filter applies after
 the index scan); `iterative` sets it to `relaxed_order`, which the pgvector README suggests for
 filtering; `exact` turns index scans off, which makes every answer exact (the control arm A0).
+The follow-up runs (`prereg/addendum-1.md`) add `iterative-100k` and `iterative-1m`: `relaxed_order`
+with `hnsw.max_scan_tuples` raised from 20,000 to 100,000 or 1,000,000 and `hnsw.scan_mem_multiplier`
+from 1 to 5 or 50, since the README ties the two ("Try increasing this if increasing
+`hnsw.max_scan_tuples` does not improve recall"). Leaving either of them resets both limits.
 
 Row-level security (arm A5) uses a second role, `bench_reader`, that is not the table's owner. Its
 policy compares the row's principals with the session setting `bench.principals`, which the
@@ -33,6 +37,11 @@ SETTINGS = {
     "iterative": ["SET hnsw.iterative_scan = relaxed_order", "SET enable_indexscan = on"],
     "exact": ["SET hnsw.iterative_scan = off", "SET enable_indexscan = off"],
 }
+# Iterative scans with wider limits (follow-up runs): (hnsw.max_scan_tuples, hnsw.scan_mem_multiplier).
+WIDE = {"iterative-100k": (100_000, 5), "iterative-1m": (1_000_000, 50)}
+for _name, (_tuples, _memory) in WIDE.items():
+    SETTINGS[_name] = SETTINGS["iterative"] + [f"SET hnsw.max_scan_tuples = {_tuples}",
+                                               f"SET hnsw.scan_mem_multiplier = {_memory}"]
 SEARCH = (
     "SELECT id, -(embedding <#> %(q)s) FROM chunks {where} ORDER BY embedding <#> %(q)s LIMIT %(k)s"
 )
@@ -52,11 +61,13 @@ def _connect(dsn: str):  # noqa: ANN202
 class PgVector:
     name = "pgvector"
     settings = ("default", "iterative")
+    extra_settings = tuple(WIDE)
 
     def __init__(self) -> None:
         self.conn = None
         self.reader = None
         self.setting = None
+        self.ef = EF_SEARCH
         self.partitions: dict[str, str] = {}
 
     def load(self, w: Workload) -> dict:
@@ -129,9 +140,18 @@ class PgVector:
     def configure(self, setting: str) -> None:
         if setting != self.setting:
             for conn in (self.conn, self.reader):
+                if self.setting in WIDE:
+                    conn.execute("RESET hnsw.max_scan_tuples")
+                    conn.execute("RESET hnsw.scan_mem_multiplier")
                 for statement in SETTINGS[setting]:
                     conn.execute(statement)
             self.setting = setting
+
+    def set_ef(self, ef: int) -> None:
+        if ef != self.ef:
+            for conn in (self.conn, self.reader):
+                conn.execute(f"SET hnsw.ef_search = {int(ef)}")
+            self.ef = ef
 
     def search(
         self,

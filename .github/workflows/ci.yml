@@ -95,3 +95,67 @@ jobs:
         with:
           name: dev-${{ matrix.store }}
           path: results/
+
+  # The follow-up plans (prereg/addendum-1.md) end to end on the synthetic workload: every sweep arm on each
+  # store; on pgvector also the wide-scan and lookup plans and both change diagnostics; then the follow-up
+  # report against results-v1's report. Checks that they run; the numbers mean nothing.
+  followup:
+    needs: unit
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        store: [pgvector, qdrant, milvus, weaviate, opensearch]
+    env:
+      STORE: ${{ matrix.store }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt
+      - name: Start the store and both engines
+        run: |
+          sudo sysctl -w vm.max_map_count=262144
+          docker compose --profile $STORE --profile authz up -d
+      - run: python -m bench.devdata --out data/dev && python -m bench.truth --workload data/dev
+      - name: Sweep plan
+        run: |
+          out=results/followup-run-sweep-dev-$STORE-seed1.jsonl.gz
+          python -m bench.run --workload data/dev --store $STORE --out $out --plan sweep --budget-s 1500
+          python -m bench.analyze --workload data/dev --run $out --check
+      - name: Wide-scan and lookup plans (pgvector)
+        if: matrix.store == 'pgvector'
+        run: |
+          python -m bench.run --workload data/dev --store pgvector --out results/followup-run-wide-dev-pgvector-seed1.jsonl.gz --plan wide
+          python -m bench.analyze --workload data/dev --run results/followup-run-wide-dev-pgvector-seed1.jsonl.gz --check
+          python -m bench.run --workload data/dev --store pgvector --out results/followup-run-lookup-dev-pgvector-seed1.jsonl.gz --plan lookup --partitions
+          python -m bench.analyze --workload data/dev --run results/followup-run-lookup-dev-pgvector-seed1.jsonl.gz --check
+      - name: Change diagnostics (pgvector, fresh servers)
+        if: matrix.store == 'pgvector'
+        run: |
+          for plan in diag-a diag-b; do
+            docker compose --profile pgvector --profile authz down -v
+            docker compose --profile pgvector --profile authz up -d
+            python -m bench.churn --workload data/dev --store pgvector --out results/followup-churn-$plan-dev-pgvector-seed1.jsonl.gz \
+              --plan $plan --events 2 --cap 20 --settle 1 --budget-s 900
+          done
+          image=$(docker compose --profile authz config --images | grep spicedb | head -1)
+          docker run --rm "$image" serve --help 2>&1 | grep -i -A3 quantization
+      - name: Follow-up report against results-v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p results-v1 && (cd results-v1 && gh release download results-v1 -p report.tar.gz -p SHA256SUMS \
+            && sha256sum -c SHA256SUMS --ignore-missing && tar xzf report.tar.gz)
+          python -m bench.followup --results results --baseline results-v1/report --out followup-report --resamples 200
+          head -c 6000 followup-report/followup.md
+      - if: always()
+        run: mkdir -p results && docker compose --profile $STORE --profile authz logs --no-color > results/compose.log 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-followup-${{ matrix.store }}
+          path: |
+            results/
+            followup-report/

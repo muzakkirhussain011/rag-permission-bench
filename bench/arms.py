@@ -22,10 +22,18 @@ post-filter wraps) and `IdFilteredStore` (a vector store whose `asimilarity_sear
 | a7-wardowl | wardowl's `PermissionedRetriever` with its SpiceDB authorizer (pgvector and Qdrant; the author's own) |
 
 `@S` is the store setting the filtered search runs under (see `bench/stores`).
+
+The follow-up runs (`prereg/addendum-1.md`) name two more things in an arm's name, never used by the
+registered runs: `:ef<N>`, the store's search breadth for that arm (the run sets it with `set_ef`),
+and `+lookup-spicedb` or `+lookup-openfga`, which first asks that engine for the user's groups and
+then runs the arm with them instead of the harness's list (`parse`, `plan_names`). For the change
+diagnostic, `Context.consistency` makes the SpiceDB arms ask for fresher reads (`Freshness`).
 """
 
 from __future__ import annotations
 
+import re
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -49,6 +57,7 @@ class Context:
     workload: Workload
     store: Any
     fga: dict = field(default_factory=dict)  # store_id, model_id from engines.load_openfga
+    consistency: Freshness | None = None  # None: what each integration sends (bench.churn's diagnostic sets it)
 
     def vector(self, key: str) -> np.ndarray:
         """`q<i>`: question i; `v<i>`: chunk i's own vector (the probes of bench.churn)."""
@@ -98,6 +107,116 @@ class IdFilteredStore(VectorStore):
 
     async def asimilarity_search(self, query: str, k: int = 4, **kwargs: Any) -> list[Document]:
         return self.similarity_search(query, k, **kwargs)
+
+
+# ---- fresher SpiceDB reads (the change diagnostic of bench.churn) ----------------------------------
+
+
+class Freshness:
+    """A SpiceDB read consistency beyond what the integrations send. langchain-spicedb sends none, which
+    SpiceDB serves as `minimize_latency`; wardowl sends `minimizeLatency`. `at_least_as_fresh` uses
+    `token`, the ZedToken of the latest change, which bench.churn sets after every SpiceDB write;
+    before the first change it asks for nothing more than the default."""
+
+    MODES = ("at_least_as_fresh", "fully_consistent")
+
+    def __init__(self, mode: str) -> None:
+        if mode not in self.MODES:
+            raise ValueError(f"unknown consistency {mode!r}")
+        self.mode = mode
+        self.token: str | None = None
+
+    def grpc(self):  # noqa: ANN201 - an authzed Consistency message, or None
+        from authzed.api.v1 import Consistency, ZedToken
+
+        if self.mode == "fully_consistent":
+            return Consistency(fully_consistent=True)
+        return Consistency(at_least_as_fresh=ZedToken(token=self.token)) if self.token else None
+
+    def http(self) -> dict:
+        if self.mode == "fully_consistent":
+            return {"fullyConsistent": True}
+        return {"atLeastAsFresh": {"token": self.token}} if self.token else {"minimizeLatency": True}
+
+
+READS = ("CheckPermission", "CheckBulkPermissions", "LookupResources")
+
+
+class ConsistentClient:
+    """An authzed client whose read requests carry a `Freshness`; every other call passes through."""
+
+    def __init__(self, client: Any, freshness: Freshness) -> None:
+        self._client, self._freshness = client, freshness
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._client, name)
+        if name not in READS:
+            return attr
+
+        def call(request: Any, *args: Any, **kwargs: Any) -> Any:
+            consistency = self._freshness.grpc()
+            if consistency is not None:
+                request.consistency.CopyFrom(consistency)
+            return attr(request, *args, **kwargs)
+
+        return call
+
+
+def fresher(authorizer: Any, freshness: Freshness) -> None:
+    """Make a langchain-spicedb `SpiceDBAuthorizer` send `freshness` on every read. The package has no
+    option for it; only the requests it builds gain the field."""
+    base = type(authorizer)
+
+    class Fresh(base):  # type: ignore[valid-type, misc]
+        @property
+        def client(self) -> Any:
+            return ConsistentClient(base.client.fget(self), freshness)
+
+    authorizer.__class__ = Fresh
+
+
+# ---- arm names of the follow-up runs ------------------------------------------------------------
+
+_NAME = re.compile(r"(?P<base>[^:+]+)(?::ef(?P<ef>[0-9]+))?(?:\+lookup-(?P<lookup>spicedb|openfga))?")
+ENGINES = ("spicedb", "openfga")
+SWEEP_EF = (40, 100, 400)
+POST_FILTERS = ("a1-fga", "a1-spicedb", "a2-fga-x3", "a2-fga-x10", "a2-spicedb-x3", "a2-spicedb-x10")
+
+
+def parse(name: str) -> tuple[str, int | None, str | None]:
+    """`a4@default:ef40+lookup-spicedb` -> ("a4@default", 40, "spicedb"); plain names -> (name, None, None)."""
+    m = _NAME.fullmatch(name)
+    if m is None:
+        raise ValueError(f"unknown arm {name!r}")
+    return m["base"], int(m["ef"]) if m["ef"] else None, m["lookup"]
+
+
+def plan_names(store: Any, plan: str) -> list[str]:
+    """The arms of one follow-up job (prereg/addendum-1.md, section 4)."""
+    lookups = ("",) + tuple(f"+lookup-{e}" for e in ENGINES)
+    if plan == "sweep":
+        settings = list(store.settings) + list(getattr(store, "extra_settings", ()))[:1]  # pgvector: iterative-100k
+        out = []
+        for ef in SWEEP_EF:
+            out += [f"a4@{s}:ef{ef}" for s in settings] + [f"{a}:ef{ef}" for a in POST_FILTERS]
+            if store.name == "opensearch":
+                out.append(f"a5-dls:ef{ef}")
+        out += [f"a4@{s}:ef100+lookup-{e}" for s in store.settings for e in ENGINES]
+        if store.name == "pgvector":
+            out = ["a0"] + out + [f"a5-rls@{s}:ef100{x}" for s in store.settings for x in lookups]
+        return out
+    if plan == "wide":
+        if store.name != "pgvector":
+            raise ValueError("the wide-scan plan runs on pgvector only")
+        return ["a4@iterative-1m:ef100"]
+    if plan == "lookup":
+        bases = [f"a4@{s}" for s in store.settings]
+        if store.name == "pgvector":
+            bases += [f"a5-rls@{s}" for s in store.settings]
+        if getattr(store, "partitions", None):
+            bases.append("a6-partition")
+        return [b + x for b in bases for x in lookups]
+    raise ValueError(f"unknown plan {plan!r}")
 
 
 # ---- arms -----------------------------------------------------------------------------------------
@@ -179,6 +298,8 @@ def _spicedb_post(ctx: Context, multiple: int) -> Run:
         permission="view",
         resource_id_key="resource_id",
     )
+    if ctx.consistency is not None:
+        fresher(auth.authorizer, ctx.consistency)
     base = StoreRetriever(ctx=ctx, k=K * multiple)
 
     async def run(user: str, groups: list[str], key: str) -> Hits:
@@ -208,6 +329,8 @@ def _spicedb_pre(ctx: Context, setting: str) -> Run:
                 permission="view",
                 k=K,
             )
+            if ctx.consistency is not None:
+                fresher(retrievers[user]._authorizer, ctx.consistency)
         return retrievers[user]
 
     async def run(user: str, groups: list[str], key: str) -> Hits:
@@ -228,9 +351,70 @@ def _wardowl(ctx: Context) -> Run:
     retriever = PermissionedRetriever(ctx.store.wardowl_backend(), authorizer)
 
     async def run(user: str, groups: list[str], key: str) -> Hits:
+        if ctx.consistency is not None:
+            authorizer.consistency = ctx.consistency.http()
         result = retriever.retrieve(Query(vector=ctx.vector(key).tolist()), Subject(user), k=K)
         return [(int(h.id[1:]), float(h.score)) for h in result.hits]
 
+    return run
+
+
+def _spicedb_groups(ctx: Context) -> Callable[[str], Awaitable[list[str]]]:
+    """The user's groups from SpiceDB: LookupResources over gRPC with no consistency field, as the
+    langchain-spicedb arms send it."""
+    from authzed.api.v1 import AsyncClient, LookupResourcesRequest, ObjectReference, SubjectReference
+    from grpcutil import insecure_bearer_token_credentials
+
+    clients: list[Any] = []  # created inside the running event loop, which the aio channel is bound to
+
+    async def lookup(user: str) -> list[str]:
+        if not clients:
+            clients.append(AsyncClient(SPICEDB_GRPC, insecure_bearer_token_credentials(SPICEDB_TOKEN)))
+        request = LookupResourcesRequest(
+            resource_object_type="group", permission="member",
+            subject=SubjectReference(object=ObjectReference(object_type="user", object_id=user)),
+        )
+        return [r.resource_object_id async for r in clients[0].LookupResources(request)]
+
+    return lookup
+
+
+def _openfga_groups(ctx: Context) -> Callable[[str], Awaitable[list[str]]]:
+    """The user's groups from OpenFGA: ListObjects through one reused openfga-sdk client, with no
+    consistency, as the FGA arms send it."""
+    from openfga_sdk import ClientConfiguration
+    from openfga_sdk.client.models import ClientListObjectsRequest
+    from openfga_sdk.sync import OpenFgaClient
+
+    client = OpenFgaClient(ClientConfiguration(
+        api_url=OPENFGA_URL, store_id=ctx.fga["store_id"], authorization_model_id=ctx.fga["model_id"]))
+
+    async def lookup(user: str) -> list[str]:
+        response = client.list_objects(ClientListObjectsRequest(user=f"user:{user}", relation="member", type="group"))
+        return [o.split(":", 1)[1] for o in response.objects]
+
+    return lookup
+
+
+def _with_lookup(ctx: Context, base: str, engine: str) -> Run:
+    """The arm `base`, given the groups the engine returns for the user instead of the harness's list.
+    Each call leaves `run.extra`: the lookup's and the search's time (their sum is the arm's latency),
+    how many groups came back and whether they equal the harness's list."""
+    lookup = _spicedb_groups(ctx) if engine == "spicedb" else _openfga_groups(ctx)
+    inner = build(base, ctx)
+
+    async def run(user: str, groups: list[str], key: str) -> Hits:
+        run.extra = {}
+        t0 = time.perf_counter_ns()
+        found = sorted(await lookup(user))
+        t1 = time.perf_counter_ns()
+        run.extra.update(lookup_ms=(t1 - t0) / 1e6, groups_found=len(found), principals_match=found == sorted(groups))
+        hits = await inner(user, found, key)
+        run.extra["search_ms"] = (time.perf_counter_ns() - t1) / 1e6
+        return hits
+
+    if hasattr(inner, "prepare"):
+        run.prepare = inner.prepare
     return run
 
 
@@ -250,6 +434,9 @@ def names(store: Any) -> list[str]:
 
 
 def build(name: str, ctx: Context) -> Run:
+    name, _, lookup = parse(name)  # the search breadth is the run's to set (bench.run)
+    if lookup is not None:
+        return _with_lookup(ctx, name, lookup)
     arm, _, setting = name.partition("@")
     if arm == "a0":
         return _exact(ctx)

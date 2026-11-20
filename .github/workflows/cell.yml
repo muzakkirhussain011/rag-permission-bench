@@ -2,7 +2,8 @@ name: cell
 
 # One cell on real data: fetch a published workload, check its checksums, start one store and both
 # engines, and run every arm (`run`) or the permission-change probes (`churn`). `label` is `pilot`
-# for harness checks (never reported) or `measured` (only after the pre-registration is deposited).
+# for harness checks (never reported) or `measured` (only after the pre-registration is deposited);
+# `followup` with a `plan` runs a job of the follow-up registered in prereg/addendum-1.md (followup.yml).
 
 on:
   workflow_dispatch:
@@ -25,8 +26,11 @@ on:
         description: pairs sampled per layout (0 = all)
         default: "0"
       label:
-        description: pilot or measured
+        description: pilot, measured or followup
         default: pilot
+      plan:
+        description: follow-up job (run sweep, wide or lookup; churn diag-a or diag-b); empty = the registered job
+        default: ""
   # measure.yml calls this for every measured cell, at most eight at a time.
   workflow_call:
     inputs:
@@ -37,13 +41,14 @@ on:
       seed: {type: string, required: true}
       pairs: {type: string, default: "0"}
       label: {type: string, default: measured}
+      plan: {type: string, default: ""}
 
 permissions:
   contents: read
 
 jobs:
   cell:
-    name: ${{ inputs.label }} ${{ inputs.kind }} ${{ inputs.workload }} ${{ inputs.store }} seed ${{ inputs.seed }}
+    name: ${{ inputs.label }} ${{ inputs.kind }} ${{ inputs.plan && format('{0} ', inputs.plan) || '' }}${{ inputs.workload }} ${{ inputs.store }} seed ${{ inputs.seed }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -98,19 +103,24 @@ jobs:
         run: |
           # A W3 seed runs as one job per share; the shares a job covers go into its name (w3_s0p5_neg -> s0p5).
           part=$(printf '%s' "$LAYOUTS" | tr ',' '\n' | sed -nE 's/^w3_(s[0-9p]+)_.*/\1/p' | sort -u | paste -sd+ -)
-          name="${{ inputs.label }}-${{ inputs.kind }}-${{ inputs.workload }}${part:+-$part}-${{ inputs.store }}-seed${{ inputs.seed }}"
+          plan="${{ inputs.plan }}"
+          name="${{ inputs.label }}-${{ inputs.kind }}${plan:+-$plan}-${{ inputs.workload }}${part:+-$part}-${{ inputs.store }}-seed${{ inputs.seed }}"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "$name"
       - name: Run
         env:
           W: ${{ inputs.workload }}
           OUT: results/${{ steps.name.outputs.name }}
+          PLAN: ${{ inputs.plan }}
         run: |
           mkdir -p results
           partitions=""
           case "$W" in w1|w2_*) [ "${{ inputs.store }}" = pgvector ] && partitions="--partitions" ;; esac
+          # Follow-up jobs name their plan and start no new work after 5 h, inside the 6 h job limit.
+          followup=""
+          [ -n "$PLAN" ] && followup="--plan $PLAN --budget-s 18000"
           if [ "${{ inputs.kind }}" = churn ]; then
-            python -m bench.churn --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }}
+            python -m bench.churn --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }} $followup
           elif [ "${{ inputs.kind }}" = faults ]; then
             # The arms' engine traffic goes through Toxiproxy; loading and changes still go straight to the engines.
             BENCH_SPICEDB_GRPC=localhost:60051 BENCH_SPICEDB_HTTP=http://localhost:60443 \
@@ -118,15 +128,23 @@ jobs:
               python -m bench.faults --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz --seed ${{ inputs.seed }}
           else
             python -m bench.run --workload data/$W --store ${{ inputs.store }} --out $OUT.jsonl.gz \
-              --seed ${{ inputs.seed }} --layouts "${{ inputs.layouts }}" --pairs-per-layout ${{ inputs.pairs }} $partitions
+              --seed ${{ inputs.seed }} --layouts "${{ inputs.layouts }}" --pairs-per-layout ${{ inputs.pairs }} $partitions \
+              $followup
           fi
           if [ "${{ inputs.kind }}" != churn ]; then
-            if [ "${{ inputs.label }}" = measured ]; then
+            if [ "${{ inputs.label }}" != pilot ]; then  # measured and followup runs are scored
               python -m bench.analyze --workload data/$W --run $OUT.jsonl.gz
             else
               python -m bench.timing --run $OUT.jsonl.gz  # pilots: timings and errors only, no recall
             fi
           fi
+      - if: always() && inputs.plan != ''
+        name: Record SpiceDB's revision-quantization flags
+        run: |
+          mkdir -p results
+          image=$(docker compose --profile authz config --images | grep spicedb | head -1)
+          docker run --rm "$image" serve --help 2>&1 | grep -i -A3 quantization > results/spicedb-serve-flags.txt || true
+          cat results/spicedb-serve-flags.txt
       - if: always()
         run: |
           mkdir -p results
