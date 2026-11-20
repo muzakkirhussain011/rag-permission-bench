@@ -39,8 +39,7 @@ STORE_SETTINGS = [("pgvector", "default"), ("pgvector", "iterative"), ("qdrant",
                   ("milvus", "default"), ("milvus", "iterative"), ("weaviate", "default"), ("weaviate", "pathseer"),
                   ("opensearch", "default")]
 ROWS = [
-    ("A1 post-filter, OpenFGA", lambda c: c["arm"] == "a1-fga"),
-    ("A1 post-filter, SpiceDB", lambda c: c["arm"] == "a1-spicedb"),
+    ("A1 post-filter (both engines)", lambda c: c["arm"] in ("a1-fga", "a1-spicedb")),
     ("A2 over $3k$ (both engines)", lambda c: c["arm"].startswith("a2-") and c["arm"].endswith("-x3")),
     ("A2 over $10k$ (both engines)", lambda c: c["arm"].startswith("a2-") and c["arm"].endswith("-x10")),
     ("A3 engine pre-filter, default", lambda c: c["arm"] == "a3-spicedb@default"),

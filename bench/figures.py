@@ -17,6 +17,7 @@ from pathlib import Path
 from .util import read_json
 
 ONE, TWO = 3.33, 7.0  # PVLDB column widths, inches
+ROW = 1.0  # height of one store's row of W3 panels, inches
 # Categorical slots in a fixed order (a validated colorblind-safe palette); never cycled.
 SLOTS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
 MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
@@ -106,7 +107,8 @@ def w3_grid(cells: list[dict], out: Path, measure: str) -> Path | None:
     stores = [s for s in STORES if any(k[0] == "w3" and k[1] == s for k in by)]
     if not stores:
         return None
-    fig, axes = plt.subplots(len(stores), 3, figsize=(TWO, 1.25 * len(stores) + 0.5), sharex=True,
+    height = ROW * len(stores) + 0.55
+    fig, axes = plt.subplots(len(stores), 3, figsize=(TWO, height), sharex=True,
                              sharey=measure == "recall", squeeze=False)
     handles = {}
     for row, store in enumerate(stores):
@@ -148,7 +150,7 @@ def w3_grid(cells: list[dict], out: Path, measure: str) -> Path | None:
     labels = [label for label in STYLE if label in handles]  # STYLE keeps the strategies' order
     fig.legend([handles[label] for label in labels], labels, loc="upper center", ncol=5, frameon=False,
                bbox_to_anchor=(0.5, 1.0))
-    fig.tight_layout(rect=(0, 0, 1, 1 - 0.32 / (1.25 * len(stores) + 0.5)))
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.34 / height))
     path = out / f"w3-{measure}.pdf"
     fig.savefig(path)
     plt.close(fig)
@@ -191,7 +193,7 @@ def churn(rows: list[dict], out: Path) -> Path | None:
         return None
     arms = sorted({r["arm"] for r in rows})
     stores = [s for s in STORES if any(r["store"] == s for r in rows)]
-    fig, axes = plt.subplots(1, 2, figsize=(TWO, 0.18 * len(arms) + 0.7), sharey=True, squeeze=False)
+    fig, axes = plt.subplots(1, 2, figsize=(TWO, 0.13 * len(arms) + 0.6), sharey=True, squeeze=False)
     for col, kind in enumerate(("revoke", "grant")):
         ax = axes[0][col]
         for slot, store in enumerate(stores):
