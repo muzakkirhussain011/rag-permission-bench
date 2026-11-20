@@ -193,7 +193,8 @@ def churn(rows: list[dict], out: Path) -> Path | None:
         return None
     arms = sorted({r["arm"] for r in rows})
     stores = [s for s in STORES if any(r["store"] == s for r in rows)]
-    fig, axes = plt.subplots(1, 2, figsize=(TWO, 0.13 * len(arms) + 0.6), sharey=True, squeeze=False)
+    height = 0.13 * len(arms) + 0.75
+    fig, axes = plt.subplots(1, 2, figsize=(TWO, height), sharey=True, squeeze=False)
     for col, kind in enumerate(("revoke", "grant")):
         ax = axes[0][col]
         for slot, store in enumerate(stores):
@@ -209,8 +210,9 @@ def churn(rows: list[dict], out: Path) -> Path | None:
         ax.set_yticks(range(len(arms)), [arm_label(a) for a in arms])
         ax.set_title("revocation" if kind == "revoke" else "grant")
         ax.set_xlabel("delay until answers reflect it (s)")
-    axes[0][1].legend(frameon=False, loc="lower right")
-    fig.tight_layout()
+    handles, labels = axes[0][1].get_legend_handles_labels()  # above the panels, clear of the data
+    fig.legend(handles, labels, loc="upper center", ncol=len(stores), frameon=False, bbox_to_anchor=(0.5, 1.0))
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.2 / height))
     path = out / "churn.pdf"
     fig.savefig(path)
     plt.close(fig)
