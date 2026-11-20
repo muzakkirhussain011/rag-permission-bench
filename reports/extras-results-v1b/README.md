@@ -1,11 +1,11 @@
 # Supplementary analyses of results-v1, second part
 
-Made by `python -m bench.extras2` in workflow run 44807243538 of muzakkirhussain011/rag-permission-bench (`.github/workflows/extras.yml`, part v1b). None of this is the registered analysis (`bench.report`) and no store or engine ran: every number comes from the release's raw outputs and report and from the workload releases. The first part is `reports/extras-results-v1`.
+Made by `python -m bench.extras2` in workflow run 44809791659 of muzakkirhussain011/rag-permission-bench (`.github/workflows/extras.yml`, part v1b). None of this is the registered analysis (`bench.report`) and no store or engine ran: every number comes from the release's raw outputs and report and from the workload releases. The first part is `reports/extras-results-v1`.
 
 - Release: `results-v1`; its `SHA256SUMS` (checked before use):
   - `176ab017dc7cd5f0a75a9c092c169cb867e2a6545cc6caaea39dc70945110506  results-raw.tar.gz`
   - `85f2f25eadf1b9f2192c6babcd05829918394ff7366a066bfac479ee1c9a7262  report.tar.gz`
-- Code: commit `2ce7be42f06d7b56281265b6c90c5850b35acd40`.
+- Code: commit `94ae33aaf5d7224d921f0a54ee5e5296ccb51e14`.
 
 | file | what it holds |
 |---|---|
