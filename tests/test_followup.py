@@ -297,4 +297,4 @@ def test_the_report_runs_on_folders_laid_out_as_the_jobs_leave_them(tmp_path, mo
     assert changes[("symmetric", "grant")]["grant_pools"] == {"unreadable-by-user": 1}
     text = (out / "followup.md").read_text()
     assert "farthest first" in text and "Reproduction" in text
-    assert "—" not in text
+    assert chr(0x2014) not in text  # no em dash
