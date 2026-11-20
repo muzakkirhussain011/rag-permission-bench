@@ -16,7 +16,8 @@ an engine: every number comes from the release's raw outputs, its report and the
   OpenSearch's document-level security. It also sets the measured A1 beside sigma_l, the readable share of each
   question's 2,048 nearest chunks (`bench.truth`).
 - (e) Answers per cell: queries, recall (`bench.report`'s estimator), answers with fewer hits than min(k, readable)
-  ("short"; an exact search never returns one), answers with recall 1, empty answers; W1 also by question kind.
+  ("short"; an exact search never returns one), answers with recall 1, empty answers; W1 also by question kind; the
+  store filter's short and exact answers by how many chunks the user may read.
 - (f) pgvector's executed plans, one per layout, setting and job, as `bench.run` kept them: the plan's shape, the
   planner's estimate of the rows the principals condition matches against the rows it did, and the rows returned.
 - (g) The engine pre-filter (A3) and the store filter (A4) on the same (job, user, question) pairs where A3 answered
@@ -44,6 +45,9 @@ from .workload import Workload
 
 K = 10
 MS = (10, 30, 100, 200, 300)
+# Readable-count bins for the store filter's answers (part e): fine around W3's achieved counts at each share.
+EDGES = (0, 100, 200, 500, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 5000, 10000, 10500, 11000, 11500, 12500, 20000,
+         40000, 50000, 51000, 60000, 100000, 200000, 500000, 10**9)
 POST = {"a1-fga": 10, "a1-spicedb": 10, "a2-fga-x3": 30, "a2-spicedb-x3": 30, "a2-fga-x10": 100,
         "a2-spicedb-x10": 100}
 SHARE_OF = {"0p001": 0.001, "0p01": 0.01, "0p05": 0.05, "0p2": 0.2, "0p5": 0.5}
@@ -166,6 +170,7 @@ def scan(results: Path) -> dict:
                                                     "exact": 0, "empty": 0, "errors": 0})
     kinds: dict[tuple, dict] = defaultdict(lambda: {"per_user": defaultdict(list), "queries": 0, "empty": 0,
                                                     "short": 0})
+    by_readable: dict[tuple, Counter] = defaultdict(Counter)  # (workload, store, arm, bin) -> answers, short, exact
     joined: dict[tuple, float] = {}  # (store, layout, arm, job, user, q) -> recall, for A3 and A4 at shares >= 0.05
     order: list[dict] = []  # per run job and cell: the arm's position and its p50
     plans: list[dict] = []
@@ -204,9 +209,16 @@ def scan(results: Path) -> dict:
             if value is not None:
                 c["per_user"][r["user"]].append(value)
             if not r["error"] and r["n_readable"]:
-                c["short"] += r["n_hits"] < min(K, r["n_readable"])
+                short = r["n_hits"] < min(K, r["n_readable"])
+                c["short"] += short
                 c["exact"] += value == 1.0
                 c["empty"] += bool(r["empty"])
+                if arm.startswith("a4@"):
+                    b = next(i for i in range(len(EDGES) - 1) if r["n_readable"] < EDGES[i + 1])
+                    x = by_readable[(workload, store, arm, b)]
+                    x["answers"] += 1
+                    x["short"] += short
+                    x["exact"] += value == 1.0
             if r.get("kind"):
                 x = kinds[(workload, store, arm, layout, r["kind"])]
                 x["queries"] += 1
@@ -219,7 +231,8 @@ def scan(results: Path) -> dict:
                 joined[(store, layout, arm, name, r["user"], r["q"])] = value
         for (arm, layout), ms in per_job.items():
             order.append({"workload": workload, "store": store, "arm": arm, "layout": layout, "job": name,
-                          "position": position[arm], "arms": len(position), "p50": float(np.percentile(ms, 50))})
+                          "position": position[arm], "arms": len(position), "p50": float(np.percentile(ms, 50)),
+                          "queries": len(ms), "over_30s": sum(x > report.TIMEOUT_MS for x in ms)})
         if store == "qdrant" and workload == "w3":
             hits: dict[tuple, list] = {}
             for r in read_jsonl_gz(meta_path.with_name(f"{name}.jsonl.gz")):
@@ -231,7 +244,7 @@ def scan(results: Path) -> dict:
                         same_hits[(arm.split("@")[0], layout)]["same" if other == h else "different"] += 1
         log(f"extras2: read {name}")
     return {"cells": cells, "kinds": kinds, "joined": joined, "order": order, "plans": plans, "churn": churn,
-            "faults": faults, "same_hits": same_hits}
+            "faults": faults, "same_hits": same_hits, "by_readable": by_readable}
 
 
 # ---------------------------------------------------------------- assembling each part
@@ -253,8 +266,11 @@ def part_answers(scanned: dict, published: list[dict]) -> dict:
     by_kind = [{"workload": k[0], "store": k[1], "arm": k[2], "layout": k[3], "kind": k[4], "queries": x["queries"],
                 "recall": estimate(x["per_user"]), "empty": x["empty"], "short": x["short"]}
                for k, x in sorted(scanned["kinds"].items())]
-    return {"cells": cells, "by_kind": by_kind, "check": {"cells": len(cells), "published": len(pub),
-                                                         "max_abs_recall_difference": worst}}
+    by_readable = [{"workload": k[0], "store": k[1], "arm": k[2], "readable_from": EDGES[k[3]],
+                    "readable_below": EDGES[k[3] + 1], "answers": x["answers"], "short": x["short"],
+                    "exact": x["exact"]} for k, x in sorted(scanned["by_readable"].items())]
+    return {"cells": cells, "by_kind": by_kind, "by_readable": by_readable,
+            "check": {"cells": len(cells), "published": len(pub), "max_abs_recall_difference": worst}}
 
 
 def part_model(models: dict[str, dict], answers: dict) -> dict:
@@ -416,10 +432,15 @@ def part_order(scanned: dict) -> dict:
                 if items[i]["position"] != items[j]["position"]:
                     pairs += 1
                     concordant += items[i]["p50"] > items[j]["p50"]
+    slow = [{"workload": k[0], "store": k[1], "arm": k[2], "layout": k[3],
+             "jobs": [{"job": o["job"], "queries": o["queries"], "over_30s": o["over_30s"], "p50_ms": o["p50"]}
+                      for o in sorted(v, key=lambda o: o["job"])]}
+            for k, v in sorted(cells.items()) if any(o["over_30s"] for o in v)]
     return {"cells_compared": compared, "earliest_was_slowest": earliest_slowest,
             "expected_if_unrelated": compared / 3 if compared else None,
             "job_pairs": pairs, "earlier_slower_share": concordant / pairs if pairs else None,
-            "median_ratio_earliest_to_latest_p50": float(np.median(ratios)) if ratios else None}
+            "median_ratio_earliest_to_latest_p50": float(np.median(ratios)) if ratios else None,
+            "cells_with_calls_over_30s": slow}
 
 
 # ---------------------------------------------------------------- markdown
@@ -484,6 +505,15 @@ def md_answers(a: dict) -> str:
         if c["workload"] != "w3":
             out.append(f"| {c['workload']} | {c['store']} | {c['arm']} | {c['queries']} | {fmt(c['recall'])} | "
                        f"{c['empty']} | {fmt(c['short_share'])} | {fmt(c['exact_share'])} |")
+    out += ["", "## The store filter's answers by how many chunks the user may read", "",
+            "Every workload pooled, per store and setting: answers whose user may read a number of chunks in the bin, "
+            "how many were short and how many exact. Bins where every answer was exact are left out here (all are in "
+            "`answers.json`).", "",
+            "| workload | store | arm | readable from | below | answers | short | exact |", "|---|---|---|---|---|---|---|---|"]
+    for x in a["by_readable"]:
+        if x["exact"] < x["answers"]:
+            out.append(f"| {x['workload']} | {x['store']} | {x['arm']} | {x['readable_from']:,} | {x['readable_below']:,} "
+                       f"| {x['answers']} | {x['short']} | {x['exact']} |")
     out += ["", "## W1 by question kind (own mail, other mail)", "",
             "| store | arm | kind | queries | recall | empty | short |", "|---|---|---|---|---|---|---|"]
     for c in a["by_kind"]:
@@ -571,7 +601,13 @@ def md_order(o: dict) -> str:
         f"- Job pairs at different positions: {o['job_pairs']}; the earlier one was slower in "
         f"{fmt(o['earlier_slower_share'])} of them.",
         f"- Median ratio of the earliest job's p50 to the latest job's: "
-        f"{fmt(o['median_ratio_earliest_to_latest_p50'])}."])
+        f"{fmt(o['median_ratio_earliest_to_latest_p50'])}.", "",
+        "## Cells with calls over 30 s, by job", "",
+        "H4 counts a call over 30 s as failed. Per job: calls over 30 s of the job's calls, and the job's p50.", "",
+        "| workload | store | arm | layout | jobs: over 30 s / calls (p50 ms) |", "|---|---|---|---|---|"]
+        + [f"| {c['workload']} | {c['store']} | {c['arm']} | {c['layout']} | "
+           + "; ".join(f"{j['over_30s']}/{j['queries']} ({j['p50_ms']:.0f})" for j in c["jobs"]) + " |"
+           for c in o["cells_with_calls_over_30s"]])
 
 
 def md_index(meta: dict, parts: dict) -> str:

@@ -99,7 +99,7 @@ def detail(k, v):
         return f"{len(parts)} cells; intervals within {f(lo)}--{f(hi)}"
     if k == "H3":
         hi = max(p["interval"][1] for p in parts)
-        return f"{len(parts)} cells; every upper end below 0 (at most ${f(hi)}$)"
+        return f"{len(parts)} pairs of cells; every upper end below 0 (at most ${f(hi)}$)"
     if k == "H4":
         return f"condition met on {sum(p['meets'] for p in parts)} of {len(parts)} stores"
     if k == "H6":
@@ -107,7 +107,8 @@ def detail(k, v):
         return f"{c['supported']} supported, {c['not supported']} not, {c['inconclusive']} inconclusive of {len(parts)}"
     if k == "H7":
         w = max(max(abs(p["interval"][0]), abs(p["interval"][1])) for p in parts)
-        return f"{len(parts)} cells; every difference exactly 0" if w == 0 else f"{len(parts)} cells; within $\\pm${f(w)}"
+        return (f"{len(parts)} pairs of cells; every difference exactly 0" if w == 0 else
+                f"{len(parts)} pairs of cells; within $\\pm${f(w)}")
     if k == "H8":
         return f"{v['outside']} outside in {v['rows']:,} rows".replace(",", "{,}")
     return ""
