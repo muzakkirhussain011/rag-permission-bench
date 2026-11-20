@@ -30,35 +30,50 @@ def rng(values):
     return f(lo) if f(lo) == f(hi) else f"{f(lo)}--{f(hi)}"
 
 
-# ---- Quality table: recall@10 per arm family and workload, range over stores ----
+# ---- Quality table: recall@10 per arm and workload. A range spans the stores where the arm's own code is the same on
+# every store; the store filter and wardowl get one row per store and setting. ----
+STORE_NAMES = {"pgvector": "pgvector", "qdrant": "Qdrant", "milvus": "Milvus", "weaviate": "Weaviate",
+               "opensearch": "OpenSearch"}
+SETTING_NAMES = {"default": "default", "iterative": "iterative", "acorn": "ACORN", "pathseer": "PathSeer"}
+STORE_SETTINGS = [("pgvector", "default"), ("pgvector", "iterative"), ("qdrant", "default"), ("qdrant", "acorn"),
+                  ("milvus", "default"), ("milvus", "iterative"), ("weaviate", "default"), ("weaviate", "pathseer"),
+                  ("opensearch", "default")]
 ROWS = [
-    ("A1 post-filter, OpenFGA", lambda a: a == "a1-fga"),
-    ("A1 post-filter, SpiceDB", lambda a: a == "a1-spicedb"),
-    ("A2 over $3k$ (both engines)", lambda a: a.startswith("a2-") and a.endswith("-x3")),
-    ("A2 over $10k$ (both engines)", lambda a: a.startswith("a2-") and a.endswith("-x10")),
-    ("A3 engine pre-filter, default", lambda a: a == "a3-spicedb@default"),
-    ("A3 engine pre-filter, alternative", lambda a: a.startswith("a3-spicedb@") and a != "a3-spicedb@default"),
-    ("A4 store filter, default", lambda a: a == "a4@default"),
-    ("A4 store filter, alternative", lambda a: a.startswith("a4@") and a != "a4@default"),
-    ("A5 row-level security, default", lambda a: a == "a5-rls@default"),
-    ("A5 row-level security, iterative", lambda a: a == "a5-rls@iterative"),
-    ("A5 document-level security", lambda a: a == "a5-dls"),
-    ("A6 partitions", lambda a: a == "a6-partition"),
-    ("A7 wardowl", lambda a: a == "a7-wardowl"),
+    ("A1 post-filter, OpenFGA", lambda c: c["arm"] == "a1-fga"),
+    ("A1 post-filter, SpiceDB", lambda c: c["arm"] == "a1-spicedb"),
+    ("A2 over $3k$ (both engines)", lambda c: c["arm"].startswith("a2-") and c["arm"].endswith("-x3")),
+    ("A2 over $10k$ (both engines)", lambda c: c["arm"].startswith("a2-") and c["arm"].endswith("-x10")),
+    ("A3 engine pre-filter, default", lambda c: c["arm"] == "a3-spicedb@default"),
+    ("A3 engine pre-filter, alternative",
+     lambda c: c["arm"].startswith("a3-spicedb@") and c["arm"] != "a3-spicedb@default"),
+]
+ROWS += [(f"A4 store filter, {STORE_NAMES[st]}" + ("" if st == "opensearch" else f", {SETTING_NAMES[se]}"),
+          lambda c, st=st, se=se: c["store"] == st and c["arm"] == f"a4@{se}") for st, se in STORE_SETTINGS]
+ROWS += [
+    ("A5 row-level security, default", lambda c: c["arm"] == "a5-rls@default"),
+    ("A5 row-level security, iterative", lambda c: c["arm"] == "a5-rls@iterative"),
+    ("A5 document-level security", lambda c: c["arm"] == "a5-dls"),
+    ("A6 partitions", lambda c: c["arm"] == "a6-partition"),
+    ("A7 wardowl, pgvector", lambda c: c["arm"] == "a7-wardowl" and c["store"] == "pgvector"),
+    ("A7 wardowl, Qdrant", lambda c: c["arm"] == "a7-wardowl" and c["store"] == "qdrant"),
 ]
 WORK = [("w1_enron", "W1"), ("w2_tree_a", "Tree"), ("w2_uniform_a", "Uniform"), ("w2_erbac_a", "ERBAC-A"),
         ("w2_erbac_b", "ERBAC-B")]
+shown = [c for c in cells if c["workload"] in dict(WORK) and c["recall"] is not None and any(p(c) for _, p in ROWS)]
+half = max((c["recall_95"][1] - c["recall_95"][0]) / 2 for c in shown)
 lines = [r"\begin{table*}[t]", r"\caption{Recall@10 on real sharing (W1, Enron, all 3{,}985 questions, 2{,}000 of them about "
          r"mail the user may not read) and HoneyBee's role-based "
-         r"workloads (W2), mean over users and three seeds; a range spans the stores an arm ran on. The exact control "
-         r"(A0) scored 1.000 in every cell. OpenSearch has one setting, counted in the default rows only. "
-         r"Per-store values with 95\% intervals are in \texttt{cells.json} of the results release.}", r"\label{tab:quality}", r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
+         r"workloads (W2), mean over users and three seeds. A range spans the stores an arm ran on; the store filter "
+         r"and wardowl have one row per store and setting. The exact control (A0) scored 1.000 in every cell. "
+         r"OpenSearch has one setting. Every 95\% interval in the table spans at most $\pm$" + f"{half:.3f}"
+         + r"; each is in \texttt{cells.json} of the results release.}", r"\label{tab:quality}", r"\footnotesize",
+         r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
          r" & W1 & \multicolumn{4}{c}{W2} \\ \cmidrule(l){3-6}",
          "Arm & Enron & " + " & ".join(n for _, n in WORK[1:]) + r" \\", r"\midrule"]
 for label, pick in ROWS:
     row = [label]
     for wl, _ in WORK:
-        vals = [c["recall"] for c in cells if c["workload"] == wl and pick(c["arm"]) and c["recall"] is not None]
+        vals = [c["recall"] for c in cells if c["workload"] == wl and pick(c) and c["recall"] is not None]
         row.append(rng(vals) if vals else "--")
     lines.append(" & ".join(row) + r" \\")
 lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}"]
@@ -168,16 +183,18 @@ def span(values):
 lines = [r"\begin{table*}[t]",
          r"\caption{The controlled sweep (W3) by readable share, summarizing Figures~\ref{fig:w3-recall} and "
          r"\ref{fig:w3-p50}: which stores' own filters (A4) recalled 1.000 (to three decimals) in all three folder "
-         r"orders, and their median latency, or else the store filter whose lowest recall over the orders "
-         r"was highest; the store filter with the lowest recall; the exact control's median "
+         r"orders, and their latency, or else the store filter whose lowest recall over the orders "
+         r"was highest; the store filter with the lowest recall; the exact control's "
          r"latency (A0, pgvector, one question per user, so over a subset of the questions the other arms answered); "
-         r"and the highest recall of any post-filter (A1, A2). Latencies in ms unless marked; ranges span the three "
-         r"folder orders and the stores named.}",
-         r"\label{tab:regimes}", r"\footnotesize", r"\begin{tabular}{@{}lllll@{}}", r"\toprule",
-         r"Share & A4 recalling 1.000 in every folder order (median latency) & Lowest A4 recall & A0 median latency & "
+         r"and the highest recall of any post-filter (A1, A2). Latency is p50 / p99, each computed per job and then "
+         r"the median over the three jobs, in ms unless marked; ranges span the three folder orders and the stores "
+         r"named.}",
+         r"\label{tab:regimes}", r"\footnotesize",
+         r"\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}Xlll@{}}", r"\toprule",
+         r"Share & A4 recalling 1.000 in every folder order (p50 / p99) & Lowest A4 recall & A0 p50 / p99 & "
          r"Best post-filter recall \\", r"\midrule"]
 for code, label in SHARES:
-    exact, lat, worst, best = [], [], None, None
+    exact, lat, lat99, worst, best = [], [], [], None, None
     for st, name in STORES:
         settings = sorted({a.split("@")[1] for (l, s, a) in W3 if s == st and a.startswith("a4@")},
                           key=lambda x: x != "default")
@@ -188,19 +205,22 @@ for code, label in SHARES:
             if worst is None or low < worst[0]:
                 worst = (low, name, SETTING[setting])
             if best is None or low > best[0]:
-                best = (low, name, SETTING[setting], [c["p50_ms"]["median"] for c in cs])
+                best = (low, name, SETTING[setting], [c["p50_ms"]["median"] for c in cs],
+                        [c["p99_ms"]["median"] for c in cs])
             if f(low) == "1.000":
                 ok.append(setting)
                 lat += [c["p50_ms"]["median"] for c in cs]
+                lat99 += [c["p99_ms"]["median"] for c in cs]
         if ok:
             exact.append(name if len(settings) == 1 else
                          f"{name} (both)" if len(ok) == len(settings) else f"{name} ({SETTING[ok[0]]})")
-    a0 = [W3[(f"w3_s{code}_{corr}", "pgvector", "a0")]["p50_ms"]["median"] for corr in CORRS]
+    a0 = [W3[(f"w3_s{code}_{corr}", "pgvector", "a0")] for corr in CORRS]
     post = max(c["recall"] for (l, s, a), c in W3.items() if l.startswith(f"w3_s{code}_") and a.startswith(("a1", "a2")))
-    held = (", ".join(exact) + f" ({span(lat)})" if exact else
-            f"none; best {f(best[0])} ({best[1]}, {best[2]}; {span(best[3])})")
-    lines.append(" & ".join([label, held, f"{f(worst[0])} ({worst[1]}, {worst[2]})", span(a0), f(post)]) + r" \\")
-lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}"]
+    held = (", ".join(exact) + f" ({span(lat)} / {span(lat99)})" if exact else
+            f"none; best {f(best[0])} ({best[1]}, {best[2]}; {span(best[3])} / {span(best[4])})")
+    a0_lat = f"{span([c['p50_ms']['median'] for c in a0])} / {span([c['p99_ms']['median'] for c in a0])}"
+    lines.append(" & ".join([label, held, f"{f(worst[0])} ({worst[1]}, {worst[2]})", a0_lat, f(post)]) + r" \\")
+lines += [r"\bottomrule", r"\end{tabularx}", r"\end{table*}"]
 (OUT / "tab-regimes.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 # ---- Numbers the text quotes ----

@@ -23,14 +23,18 @@ MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
 ALTERNATIVE = {"pgvector": "iterative", "qdrant": "acorn", "milvus": "iterative", "weaviate": "pathseer",
                "opensearch": "default"}
 STORES = ["pgvector", "qdrant", "milvus", "weaviate", "opensearch"]
-CORRELATIONS = [("neg", "negative"), ("none", "none"), ("pos", "positive")]
+# Column titles name the order in which a layout grants folders (the layouts' measured correlation does not
+# follow the sign the order was meant to give at every share; extras-results-v1, workloads.md).
+CORRELATIONS = [("neg", "farthest folders first"), ("none", "folders in random order"),
+                ("pos", "nearest folders first")]
 SHARES = [0.001, 0.01, 0.05, 0.2, 0.5]
 
 
 def strategies(store: str) -> list[tuple[str, list[str]]]:
     """(label, arm names in order of preference) for the W3 figures; the first arm present is drawn.
     Post-filters are drawn with SpiceDB; OpenFGA's rows are in the tables. A store's alternative setting
-    (`ALTERNATIVE`) shares one label, since each store has one."""
+    (`ALTERNATIVE`) shares one label, since each store has one. Row-level security (pgvector) and document-level
+    security (OpenSearch) get one label each; they never share a panel, so they share a color and differ in marker."""
     alt = ALTERNATIVE[store]
     return [
         ("A1 post-filter, k", ["a1-spicedb"]),
@@ -39,9 +43,17 @@ def strategies(store: str) -> list[tuple[str, list[str]]]:
         ("A3 engine pre-filter", ["a3-spicedb@default"]),
         ("A4 store filter, default", ["a4@default"]),
         ("A4 store filter, alternative", [f"a4@{alt}"] if alt != "default" else []),
-        ("A5 database-native", ["a5-rls@default", "a5-dls"]),
+        ("A5 row-level security", ["a5-rls@default"]),
+        ("A5 document-level security", ["a5-dls"]),
         ("A7 wardowl", ["a7-wardowl"]),
     ]
+
+
+# (color slot, marker) per W3 label: a fixed color per strategy, so A5's two features share one.
+STYLE = {"A1 post-filter, k": (0, "o"), "A2 post-filter, 3k": (1, "s"), "A2 post-filter, 10k": (2, "^"),
+         "A3 engine pre-filter": (3, "D"), "A4 store filter, default": (4, "v"),
+         "A4 store filter, alternative": (5, "P"), "A5 row-level security": (6, "X"),
+         "A5 document-level security": (6, "h"), "A7 wardowl": (7, "*")}
 
 
 SETTING_NAMES = {"default": "default", "iterative": "iterative", "acorn": "ACORN", "pathseer": "PathSeer"}
@@ -100,7 +112,8 @@ def w3_grid(cells: list[dict], out: Path, measure: str) -> Path | None:
     for row, store in enumerate(stores):
         for col, (corr, title) in enumerate(CORRELATIONS):
             ax = axes[row][col]
-            for slot, (label, names) in enumerate(strategies(store)):
+            for label, names in strategies(store):
+                slot, marker = STYLE[label]
                 arm = next((a for a in names if any(by.get(("w3", store, a, _layout(s, corr))) for s in SHARES)), None)
                 if arm is None:
                     continue
@@ -118,7 +131,7 @@ def w3_grid(cells: list[dict], out: Path, measure: str) -> Path | None:
                     xs.append(share), ys.append(y), lo.append(y - a), hi.append(b - y)
                 if not xs:
                     continue
-                h = ax.errorbar(xs, ys, yerr=[lo, hi], color=SLOTS[slot], marker=MARKERS[slot], capsize=0,
+                h = ax.errorbar(xs, ys, yerr=[lo, hi], color=SLOTS[slot], marker=marker, capsize=0,
                                 elinewidth=0.6, label=label)
                 handles.setdefault(label, h)
             ax.set_xscale("log")
@@ -127,12 +140,13 @@ def w3_grid(cells: list[dict], out: Path, measure: str) -> Path | None:
             else:
                 ax.set_yscale("log")
             if row == 0:
-                ax.set_title(f"correlation: {title}")
+                ax.set_title(title)
             if col == 0:
                 ax.set_ylabel(f"{store}\n" + ("recall@10" if measure == "recall" else "p50 latency (ms)"))
             if row == len(stores) - 1:
                 ax.set_xlabel("readable share")
-    fig.legend(list(handles.values()), list(handles), loc="upper center", ncol=4, frameon=False,
+    labels = [label for label in STYLE if label in handles]  # STYLE keeps the strategies' order
+    fig.legend([handles[label] for label in labels], labels, loc="upper center", ncol=5, frameon=False,
                bbox_to_anchor=(0.5, 1.0))
     fig.tight_layout(rect=(0, 0, 1, 1 - 0.32 / (1.25 * len(stores) + 0.5)))
     path = out / f"w3-{measure}.pdf"

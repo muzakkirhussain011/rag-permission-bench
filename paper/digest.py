@@ -79,10 +79,12 @@ for k, v in hyp.items():
 
 def table(workload, title):
     w(f"## {title}\n")
-    w("| store | arm | recall@10 [95%] | p50 ms (median of jobs) | empty | errors | outside | queries |\n|---|---|---|---|---|---|---|---|")
+    w("| store | arm | recall@10 [95%] | p50 ms (median of jobs) | p99 ms (median of jobs) | empty | errors | outside | "
+      "queries |\n|---|---|---|---|---|---|---|---|---|")
     rows = [c for c in cells if c["workload"] == workload]
     for c in sorted(rows, key=lambda c: (STORES.index(c["store"]) if c["store"] in STORES else 9, c["arm"])):
-        w(f"| {c['store']} | {c['arm']} | {ci(c)} | {ms(c['p50_ms'])} | {c['empty']} | {c['errors']} | {c['outside']} | {c['queries']} |")
+        w(f"| {c['store']} | {c['arm']} | {ci(c)} | {ms(c['p50_ms'])} | {ms(c['p99_ms'])} | {c['empty']} | {c['errors']} | "
+          f"{c['outside']} | {c['queries']} |")
     w("")
 
 
@@ -110,17 +112,25 @@ for arm in arms:
         if found:
             w(f"| {st} | " + " | ".join(row) + " |")
     w("")
-w("## W3: median p50 latency (ms) by arm, store and share (median over correlations)\n")
-for arm in arms:
-    line = []
-    for st in STORES:
-        vals = []
-        for s in shares:
-            ps = [c["p50_ms"]["median"] for c in w3 if c["arm"] == arm and c["store"] == st and c["layout"].startswith(f"w3_s{s}_") and c["p50_ms"]]
-            vals.append(f"{sorted(ps)[len(ps) // 2]:.1f}" if ps else "")
-        if any(vals):
-            line.append(f"{st}: " + " / ".join(vals))
-    w(f"- {arm}: " + "; ".join(line))
+for key, title in (("p50_ms", "p50"), ("p99_ms", "p99")):
+    w(f"## W3: median {title} latency (ms) by arm, store and share (median over correlations)\n")
+    for arm in arms:
+        line = []
+        for st in STORES:
+            vals = []
+            for s in shares:
+                ps = [c[key]["median"] for c in w3 if c["arm"] == arm and c["store"] == st and c["layout"].startswith(f"w3_s{s}_") and c[key]]
+                vals.append(f"{sorted(ps)[len(ps) // 2]:.1f}" if ps else "")
+            if any(vals):
+                line.append(f"{st}: " + " / ".join(vals))
+        w(f"- {arm}: " + "; ".join(line))
+    w("")
+w("## W3: per-job p50 latency (ms), fastest and slowest job, for A0, A3 and A4, by store and layout\n")
+for c in sorted(w3, key=lambda c: (c["arm"], STORES.index(c["store"]), c["layout"])):
+    if c["arm"] == "a0" or c["arm"].startswith(("a3", "a4")):
+        w(f"- {c['arm']} {c['store']} {c['layout']}: median {c['p50_ms']['median']:.1f}, jobs {c['p50_ms']['min']:.1f} to "
+          f"{c['p50_ms']['max']:.1f}; p99 median {c['p99_ms']['median']:.1f}, jobs {c['p99_ms']['min']:.1f} to "
+          f"{c['p99_ms']['max']:.1f}")
 w("")
 w("## W3 share 0.5, A3 (engine pre-filter): failures and latency (H4)\n")
 for c in w3:
