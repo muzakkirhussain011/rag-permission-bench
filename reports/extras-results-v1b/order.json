@@ -399,12 +399,12 @@
  "earlier_slower_share": 0.5,
  "earliest_was_slowest": 369,
  "expected_if_unrelated": 361.6666666666667,
- "git_sha": "056137ff11ffda17014009cd042afa5bb809197c",
+ "git_sha": "2ce7be42f06d7b56281265b6c90c5850b35acd40",
  "job_pairs": 3020,
  "made_by": "bench.extras2",
  "median_ratio_earliest_to_latest_p50": 0.9867710864023089,
  "registered_analysis": false,
  "release": "results-v1",
  "repository": "muzakkirhussain011/rag-permission-bench",
- "run_id": "44805457558"
+ "run_id": "44807243538"
 }
