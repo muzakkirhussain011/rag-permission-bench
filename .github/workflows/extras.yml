@@ -1,7 +1,8 @@
 name: extras
 
 # Supplementary analyses of a measured release, computed here rather than on a personal machine. Not the registered
-# analysis (bench.report, which report.yml runs); part (c) of bench.extras is exploratory. One job:
+# analysis (bench.report, which report.yml runs); part (c) of bench.extras is exploratory. Two jobs; `part` picks
+# which run (v1, v1b or both). Job `extras` (part v1, reports/extras-results-v1):
 # - rebuilds the report and its figures from the release's raw outputs (bench.report, bench.figures), the way
 #   report.yml made them, and bench.extras compares the rebuilt report with the published one;
 # - regenerates the paper's tables and digest from the published report (paper/tables.py, paper/digest.py);
@@ -9,6 +10,10 @@ name: extras
 #   (b) latency percentiles, memory, sizes and build times the jobs recorded, (c) the registered intervals of H1 to H8
 #   with questions resampled as clusters.
 # Everything is kept as the artifact `extras`.
+# Job `extras2` (part v1b, reports/extras-results-v1b) runs bench.extras2 on the same release, the workloads and the
+# corpus vectors (the post-filter model needs each question's exact unfiltered neighbours), draws the paper's figures
+# with bench.figures from the published report, regenerates the paper's tables and digest, and keeps it all, with PNG
+# previews of the figures, as the artifact `extras-v1b`.
 
 on:
   workflow_dispatch:
@@ -19,6 +24,9 @@ on:
       resamples:
         description: bootstrap resamples for part (c)
         default: "10000"
+      part:
+        description: which analyses to run (v1, v1b or all)
+        default: all
 
 permissions:
   contents: read
@@ -29,6 +37,7 @@ env:
 
 jobs:
   extras:
+    if: inputs.part != 'v1b'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -80,4 +89,69 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: extras
+          path: out/
+
+  extras2:
+    if: inputs.part != 'v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h / && nproc && free -g
+      - run: pip install -r requirements-lock.txt && pip install -r requirements-run.txt -r requirements-report.txt
+      - name: Fetch and check the release, the workloads and the corpus vectors
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p release published data/msmarco data/enron workloads out/v1b
+          gh release download "$TAG" -R "$RELEASES_REPO" -D release
+          (cd release && sha256sum -c SHA256SUMS)
+          tar xzf release/results-raw.tar.gz            # artifacts/<job>/
+          tar xzf release/report.tar.gz -C published     # published/report/
+          gh release download data-msmarco-v1 -R "$RELEASES_REPO" -D data/msmarco \
+            -p 'w3-workload.tar.gz' -p 'w2_*-workload.tar.gz' -p vectors.npy -p queries.npy -p SHA256SUMS
+          (cd data/msmarco && sha256sum -c SHA256SUMS --ignore-missing)
+          gh release download data-enron-v2 -R "$RELEASES_REPO" -D data/enron \
+            -p w1-workload.tar.gz -p w1-vectors.npy -p w1-queries.npy -p SHA256SUMS
+          (cd data/enron && sha256sum -c SHA256SUMS --ignore-missing)
+          for f in data/msmarco/*-workload.tar.gz data/enron/*-workload.tar.gz; do
+            name=$(basename "$f" -workload.tar.gz)
+            mkdir -p "workloads/$name" && tar xzf "$f" -C "workloads/$name"
+          done
+          # Each workload reads its corpus beside it; W2 uses the first n_chunks rows of the MS MARCO corpus.
+          for d in workloads/w3 workloads/w2_*; do
+            ln -s "$PWD/data/msmarco/vectors.npy" "$d/vectors.npy"; ln -s "$PWD/data/msmarco/queries.npy" "$d/queries.npy"
+          done
+          ln -s "$PWD/data/enron/w1-vectors.npy" workloads/w1/vectors.npy
+          ln -s "$PWD/data/enron/w1-queries.npy" workloads/w1/queries.npy
+          echo "$(ls artifacts | wc -l) job folders"; ls workloads
+      - name: The paper's figures, tables and digest from the published report
+        run: |
+          python -m bench.figures --report published/report --out out/v1b/figures
+          python paper/tables.py published/report out/paper-tables
+          python paper/digest.py published/report > out/paper-tables/digest.md
+      - name: Supplementary analyses, second part (bench.extras2)
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python -m bench.extras2 --results artifacts --report published/report --workloads workloads \
+            --out out/v1b --release "$TAG" --checksums release/SHA256SUMS
+          cat out/v1b/README.md >> "$GITHUB_STEP_SUMMARY"
+      - name: PNG previews of the figures (not part of the outputs)
+        if: always()
+        run: |
+          sudo apt-get install -y -q poppler-utils > /dev/null
+          mkdir -p out/previews
+          for f in out/v1b/figures/*.pdf; do pdftoppm -png -r 120 "$f" "out/previews/$(basename "$f" .pdf)"; done
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extras-v1b
           path: out/

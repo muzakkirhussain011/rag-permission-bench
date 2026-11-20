@@ -1,0 +1,19 @@
+\begin{table}[t]
+\caption{The pre-registered hypotheses and their verdicts, each judged on a 99.375\% interval (Bonferroni over eight) by the registered rule; a hypothesis with several parts (cells, or pairs of cells it compares) is supported only if it is supported in every part.}
+\label{tab:hypotheses}
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{1.3cm}>{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+& Prediction & Verdict & Evidence \\
+\midrule
+H1 & W1 own mail: A1 recall@10 below 0.5 & supported & 10 cells; intervals within 0.227--0.306 \\
+H2 & W1 own mail: A2 over $10k$ below 0.9 & supported & 10 cells; intervals within 0.410--0.512 \\
+H3 & W3, shares to 0.05: A1, A2 lower under negative than positive correlation & supported & 90 pairs of cells; every upper end below 0 (at most $-0.001$) \\
+H4 & W3 share 0.5: A3 fails or exceeds 10\,s on a store & supported & condition met on 5 of 5 stores \\
+H5 & W3 share 0.01: pgvector without iterative scans below 0.5 & supported & 3 cells; intervals within 0.001--0.186 \\
+H6 & W3: every store's alternative setting at least 0.9 in every cell & not supported & 58 supported, 13 not, 4 inconclusive of 75 \\
+H7 & W3: row-level security within 0.02 of the store filter & supported & 30 pairs of cells; every difference exactly 0 \\
+H8 & Engine stopped: nothing outside the readable set & supported & 0 outside in 12{,}300 rows \\
+\bottomrule
+\end{tabularx}
+\end{table}

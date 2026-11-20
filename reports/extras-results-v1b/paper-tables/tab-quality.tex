@@ -1,0 +1,32 @@
+\begin{table*}[t]
+\caption{Recall@10 on real sharing (W1, Enron, all 3{,}985 questions, 2{,}000 of them about mail the user may not read) and HoneyBee's role-based workloads (W2), mean over users and three seeds. A range spans the stores an arm ran on; the store filter and wardowl have one row per store and setting. The exact control (A0) scored 1.000 in every cell. OpenSearch has one setting. Every 95\% interval in the table spans at most $\pm$0.070; each is in \texttt{cells.json} of the results release.}
+\label{tab:quality}
+\footnotesize
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+ & W1 & \multicolumn{4}{c}{W2} \\ \cmidrule(l){3-6}
+Arm & Enron & Tree & Uniform & ERBAC-A & ERBAC-B \\
+\midrule
+A1 post-filter (both engines) & 0.127--0.134 & 0.043--0.044 & 0.036--0.037 & 0.073--0.074 & 0.148--0.151 \\
+A2 over $3k$ (both engines) & 0.181--0.190 & 0.124--0.125 & 0.119--0.120 & 0.230--0.231 & 0.445--0.449 \\
+A2 over $10k$ (both engines) & 0.227--0.237 & 0.412--0.414 & 0.383--0.388 & 0.622--0.651 & 0.800--0.848 \\
+A3 engine pre-filter, default & 1.000 & 0.153--1.000 & 0.623--1.000 & 0.693--1.000 & 0.750--0.990 \\
+A3 engine pre-filter, alternative & 0.962--1.000 & 0.952--1.000 & 0.954--1.000 & 0.946--1.000 & 0.944--0.991 \\
+A4 store filter, pgvector, default & 0.984 & 0.413 & 0.429 & 0.673 & 0.813 \\
+A4 store filter, pgvector, iterative & 0.996 & 0.951 & 0.952 & 0.943 & 0.943 \\
+A4 store filter, Qdrant, default & 1.000 & 0.163 & 0.871 & 0.703 & 0.749 \\
+A4 store filter, Qdrant, ACORN & 1.000 & 0.964 & 0.999 & 0.990 & 0.991 \\
+A4 store filter, Milvus, default & 1.000 & 1.000 & 0.998 & 0.986 & 0.975 \\
+A4 store filter, Milvus, iterative & 0.962 & 0.962 & 0.954 & 0.964 & 0.965 \\
+A4 store filter, Weaviate, default & 1.000 & 1.000 & 1.000 & 1.000 & 0.980 \\
+A4 store filter, Weaviate, PathSeer & 1.000 & 1.000 & 1.000 & 1.000 & 0.988 \\
+A4 store filter, OpenSearch & 1.000 & 1.000 & 1.000 & 0.992 & 0.990 \\
+A5 row-level security, default & 0.984 & 0.413 & 0.432 & 0.673 & 0.813 \\
+A5 row-level security, iterative & 0.996 & 0.951 & 0.952 & 0.943 & 0.943 \\
+A5 document-level security & 0.209 & 0.322 & 0.282 & 0.418 & 0.519 \\
+A6 partitions & 1.000 & 1.000 & 0.997 & 0.998 & 0.999 \\
+A7 wardowl, pgvector & 0.635 & 0.982 & 0.950 & 0.953 & 0.963 \\
+A7 wardowl, Qdrant & 0.986 & 0.975 & 0.960 & 0.952 & 0.958 \\
+\bottomrule
+\end{tabular}
+\end{table*}

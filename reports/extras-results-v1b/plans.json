@@ -1,0 +1,2991 @@
+{
+ "checksums": [
+  "176ab017dc7cd5f0a75a9c092c169cb867e2a6545cc6caaea39dc70945110506  results-raw.tar.gz",
+  "85f2f25eadf1b9f2192c6babcd05829918394ff7366a066bfac479ee1c9a7262  report.tar.gz"
+ ],
+ "git_sha": "94ae33aaf5d7224d921f0a54ee5e5296ccb51e14",
+ "made_by": "bench.extras2",
+ "plans": [
+  {
+   "actual_rows": [
+    54
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    146,
+    150
+   ],
+   "execution_ms": [
+    0.08,
+    0.16,
+    0.16
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w1_enron",
+   "planned_pair_readable": 54,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w1_enron"
+  },
+  {
+   "actual_rows": [
+    54
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    146,
+    150
+   ],
+   "execution_ms": [
+    0.18,
+    0.18,
+    0.2
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w1_enron",
+   "planned_pair_readable": 54,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w1_enron"
+  },
+  {
+   "actual_rows": [
+    54
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    146,
+    150
+   ],
+   "execution_ms": [
+    0.07,
+    0.13,
+    0.14
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w1_enron",
+   "planned_pair_readable": 54,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w1_enron"
+  },
+  {
+   "actual_rows": [
+    54
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    146,
+    150
+   ],
+   "execution_ms": [
+    0.1,
+    0.14,
+    0.16
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w1_enron",
+   "planned_pair_readable": 54,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w1_enron"
+  },
+  {
+   "actual_rows": [
+    54
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    146,
+    150
+   ],
+   "execution_ms": [
+    0.1,
+    0.13,
+    0.13
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w1_enron",
+   "planned_pair_readable": 54,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w1_enron"
+  },
+  {
+   "actual_rows": [
+    1,
+    2
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    1986,
+    2146,
+    2153
+   ],
+   "execution_ms": [
+    2.33,
+    2.44,
+    3.06
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_a",
+   "planned_pair_readable": 2092,
+   "removed_by_filter": [
+    98,
+    99
+   ],
+   "rows_returned": [
+    1,
+    2
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_a"
+  },
+  {
+   "actual_rows": [
+    2092
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    1986,
+    2146,
+    2153
+   ],
+   "execution_ms": [
+    3.01,
+    3.29,
+    3.45
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w2_erbac_a",
+   "planned_pair_readable": 2092,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w2_erbac_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    1986,
+    2146,
+    2153
+   ],
+   "execution_ms": [
+    13.72,
+    14.08,
+    14.58
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_a",
+   "planned_pair_readable": 2092,
+   "removed_by_filter": [
+    768,
+    770,
+    774
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_a"
+  },
+  {
+   "actual_rows": [
+    1,
+    2
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    1986,
+    2146,
+    2153
+   ],
+   "execution_ms": [
+    2.03,
+    2.25,
+    2.47
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_a",
+   "planned_pair_readable": 2092,
+   "removed_by_filter": [
+    98,
+    99
+   ],
+   "rows_returned": [
+    1,
+    2
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    1986,
+    2146,
+    2153
+   ],
+   "execution_ms": [
+    13.27,
+    14.71,
+    16.03
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_a",
+   "planned_pair_readable": 2092,
+   "removed_by_filter": [
+    768,
+    770,
+    774
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    46914,
+    47506,
+    47523
+   ],
+   "execution_ms": [
+    2.07,
+    2.35,
+    3.16
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_b",
+   "planned_pair_readable": 47509,
+   "removed_by_filter": [
+    21
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_b"
+  },
+  {
+   "actual_rows": [
+    47508
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    19548,
+    19794,
+    19801
+   ],
+   "execution_ms": [
+    45.24,
+    48.75,
+    62.02
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w2_erbac_b",
+   "planned_pair_readable": 47509,
+   "removed_by_filter": [
+    50830
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w2_erbac_b"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    46914,
+    47506,
+    47523
+   ],
+   "execution_ms": [
+    0.99,
+    1.8,
+    2.75
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_b",
+   "planned_pair_readable": 47509,
+   "removed_by_filter": [
+    21
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_b"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    46914,
+    47506,
+    47523
+   ],
+   "execution_ms": [
+    1.01,
+    1.91,
+    1.98
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_b",
+   "planned_pair_readable": 47509,
+   "removed_by_filter": [
+    21
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_b"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    46914,
+    47506,
+    47523
+   ],
+   "execution_ms": [
+    0.7,
+    1.47,
+    1.7
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_erbac_b",
+   "planned_pair_readable": 47509,
+   "removed_by_filter": [
+    21
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_erbac_b"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    4497,
+    4803,
+    4826
+   ],
+   "execution_ms": [
+    2.24,
+    2.59,
+    2.6
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_tree_a",
+   "planned_pair_readable": 4000,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_tree_a"
+  },
+  {
+   "actual_rows": [
+    4000
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    4497,
+    4803,
+    4826
+   ],
+   "execution_ms": [
+    5.97,
+    6.11,
+    6.37
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w2_tree_a",
+   "planned_pair_readable": 4000,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w2_tree_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    4497,
+    4803,
+    4826
+   ],
+   "execution_ms": [
+    7.82,
+    8.38,
+    10.18
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_tree_a",
+   "planned_pair_readable": 4000,
+   "removed_by_filter": [
+    470,
+    471,
+    473
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_tree_a"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    4497,
+    4803,
+    4826
+   ],
+   "execution_ms": [
+    1.33,
+    1.61,
+    2.1
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_tree_a",
+   "planned_pair_readable": 4000,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_tree_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    4497,
+    4803,
+    4826
+   ],
+   "execution_ms": [
+    7.59,
+    8.33,
+    9.7
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_tree_a",
+   "planned_pair_readable": 4000,
+   "removed_by_filter": [
+    470,
+    471,
+    473
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_tree_a"
+  },
+  {
+   "actual_rows": [
+    3
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    10766,
+    10805,
+    10997
+   ],
+   "execution_ms": [
+    1.44,
+    1.45,
+    1.62
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_uniform_a",
+   "planned_pair_readable": 10823,
+   "removed_by_filter": [
+    97
+   ],
+   "rows_returned": [
+    3
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_uniform_a"
+  },
+  {
+   "actual_rows": [
+    10823
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    10766,
+    10805,
+    10997
+   ],
+   "execution_ms": [
+    16.7,
+    17.59,
+    19.17
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w2_uniform_a",
+   "planned_pair_readable": 10823,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w2_uniform_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    10766,
+    10805,
+    10997
+   ],
+   "execution_ms": [
+    4.03,
+    5.16,
+    5.41
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_uniform_a",
+   "planned_pair_readable": 10823,
+   "removed_by_filter": [
+    227,
+    228,
+    229
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_uniform_a"
+  },
+  {
+   "actual_rows": [
+    3
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    10766,
+    10805,
+    10997
+   ],
+   "execution_ms": [
+    0.96,
+    1.06,
+    1.49
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_uniform_a",
+   "planned_pair_readable": 10823,
+   "removed_by_filter": [
+    97
+   ],
+   "rows_returned": [
+    3
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_uniform_a"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    10766,
+    10805,
+    10997
+   ],
+   "execution_ms": [
+    4.26,
+    5.15,
+    5.91
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w2_uniform_a",
+   "planned_pair_readable": 10823,
+   "removed_by_filter": [
+    227,
+    228,
+    229
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w2_uniform_a"
+  },
+  {
+   "actual_rows": [
+    1192
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    1366,
+    1399
+   ],
+   "execution_ms": [
+    0.99,
+    1.22,
+    1.69
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_neg",
+   "planned_pair_readable": 1192,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1192
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    1366,
+    1399
+   ],
+   "execution_ms": [
+    3.0,
+    3.02,
+    3.09
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_neg",
+   "planned_pair_readable": 1192,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1192
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    1366,
+    1399
+   ],
+   "execution_ms": [
+    0.8,
+    1.02,
+    1.38
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_neg",
+   "planned_pair_readable": 1192,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1192
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    1366,
+    1399
+   ],
+   "execution_ms": [
+    0.8,
+    1.07,
+    1.19
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_neg",
+   "planned_pair_readable": 1192,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1192
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    1366,
+    1399
+   ],
+   "execution_ms": [
+    0.75,
+    0.99,
+    1.15
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_neg",
+   "planned_pair_readable": 1192,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1042
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    933,
+    1167
+   ],
+   "execution_ms": [
+    1.06,
+    1.18,
+    1.22
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_none",
+   "planned_pair_readable": 1042,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1042
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    933,
+    1167
+   ],
+   "execution_ms": [
+    3.18,
+    3.26,
+    3.5
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_none",
+   "planned_pair_readable": 1042,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1042
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    933,
+    1167
+   ],
+   "execution_ms": [
+    0.8,
+    0.91,
+    1.08
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_none",
+   "planned_pair_readable": 1042,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1042
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    933,
+    1167
+   ],
+   "execution_ms": [
+    0.77,
+    0.98,
+    1.04
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_none",
+   "planned_pair_readable": 1042,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1042
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    933,
+    1167
+   ],
+   "execution_ms": [
+    0.65,
+    0.85,
+    0.98
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_none",
+   "planned_pair_readable": 1042,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1314
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    1100,
+    1300,
+    1500
+   ],
+   "execution_ms": [
+    1.66,
+    2.04,
+    2.25
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_pos",
+   "planned_pair_readable": 1314,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1314
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    1100,
+    1300,
+    1500
+   ],
+   "execution_ms": [
+    3.5,
+    5.41,
+    5.42
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_pos",
+   "planned_pair_readable": 1314,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1314
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    1100,
+    1300,
+    1500
+   ],
+   "execution_ms": [
+    1.35,
+    1.75,
+    1.95
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_pos",
+   "planned_pair_readable": 1314,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1314
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    1100,
+    1300,
+    1500
+   ],
+   "execution_ms": [
+    1.35,
+    1.48,
+    1.77
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_pos",
+   "planned_pair_readable": 1314,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1314
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    1100,
+    1300,
+    1500
+   ],
+   "execution_ms": [
+    1.15,
+    1.35,
+    1.58
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p001_pos",
+   "planned_pair_readable": 1314,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    10055,
+    10351,
+    11672
+   ],
+   "execution_ms": [
+    2.01,
+    2.17,
+    5.81
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_neg",
+   "planned_pair_readable": 10383,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10383
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    10055,
+    10351,
+    11672
+   ],
+   "execution_ms": [
+    17.95,
+    19.13,
+    25.02
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p01_neg",
+   "planned_pair_readable": 10383,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    10055,
+    10351,
+    11672
+   ],
+   "execution_ms": [
+    59.62,
+    64.7,
+    102.02
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_neg",
+   "planned_pair_readable": 10383,
+   "removed_by_filter": [
+    12166,
+    12173,
+    12181
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    10055,
+    10351,
+    11672
+   ],
+   "execution_ms": [
+    2.0,
+    2.1,
+    2.33
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_neg",
+   "planned_pair_readable": 10383,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    10055,
+    10351,
+    11672
+   ],
+   "execution_ms": [
+    50.24,
+    55.02,
+    61.7
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_neg",
+   "planned_pair_readable": 10383,
+   "removed_by_filter": [
+    12166,
+    12173,
+    12181
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    10353,
+    10847,
+    10914
+   ],
+   "execution_ms": [
+    1.6,
+    1.86,
+    5.39
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_none",
+   "planned_pair_readable": 10842,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10842
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    10353,
+    10847,
+    10914
+   ],
+   "execution_ms": [
+    22.82,
+    23.98,
+    32.27
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p01_none",
+   "planned_pair_readable": 10842,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    10353,
+    10847,
+    10914
+   ],
+   "execution_ms": [
+    70.3,
+    80.61,
+    121.12
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_none",
+   "planned_pair_readable": 10842,
+   "removed_by_filter": [
+    18612,
+    18623,
+    18643
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    10353,
+    10847,
+    10914
+   ],
+   "execution_ms": [
+    1.54,
+    1.62,
+    1.82
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_none",
+   "planned_pair_readable": 10842,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    10353,
+    10847,
+    10914
+   ],
+   "execution_ms": [
+    51.01,
+    59.72,
+    63.89
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_none",
+   "planned_pair_readable": 10842,
+   "removed_by_filter": [
+    18612,
+    18623,
+    18643
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    10422,
+    10950,
+    10983
+   ],
+   "execution_ms": [
+    1.47,
+    1.52,
+    4.6
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_pos",
+   "planned_pair_readable": 10663,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10663
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    10422,
+    10950,
+    10983
+   ],
+   "execution_ms": [
+    29.99,
+    31.66,
+    48.63
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p01_pos",
+   "planned_pair_readable": 10663,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    10422,
+    10950,
+    10983
+   ],
+   "execution_ms": [
+    37.51,
+    37.61,
+    77.97
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_pos",
+   "planned_pair_readable": 10663,
+   "removed_by_filter": [
+    3228,
+    3229,
+    3230
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    10422,
+    10950,
+    10983
+   ],
+   "execution_ms": [
+    1.55,
+    1.59,
+    1.63
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_pos",
+   "planned_pair_readable": 10663,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    10422,
+    10950,
+    10983
+   ],
+   "execution_ms": [
+    30.7,
+    32.73,
+    34.97
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p01_pos",
+   "planned_pair_readable": 10663,
+   "removed_by_filter": [
+    3228,
+    3229,
+    3230
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    47588,
+    50192,
+    52788
+   ],
+   "execution_ms": [
+    2.79,
+    2.96,
+    10.25
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_neg",
+   "planned_pair_readable": 50682,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    50682
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    47588,
+    50192,
+    52788
+   ],
+   "execution_ms": [
+    97.85,
+    108.11,
+    132.17
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p05_neg",
+   "planned_pair_readable": 50682,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    47588,
+    50192,
+    52788
+   ],
+   "execution_ms": [
+    94.85,
+    119.08,
+    143.97
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_neg",
+   "planned_pair_readable": 50682,
+   "removed_by_filter": [
+    19960,
+    19973,
+    19991
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    0
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    47588,
+    50192,
+    52788
+   ],
+   "execution_ms": [
+    2.9,
+    3.0,
+    3.34
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_neg",
+   "planned_pair_readable": 50682,
+   "removed_by_filter": [
+    100
+   ],
+   "rows_returned": [
+    0
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    47588,
+    50192,
+    52788
+   ],
+   "execution_ms": [
+    103.02,
+    114.88,
+    134.06
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_neg",
+   "planned_pair_readable": 50682,
+   "removed_by_filter": [
+    19960,
+    19973,
+    19991
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    48643,
+    49340,
+    50734
+   ],
+   "execution_ms": [
+    1.74,
+    1.86,
+    6.62
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_none",
+   "planned_pair_readable": 50879,
+   "removed_by_filter": [
+    99
+   ],
+   "rows_returned": [
+    1
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    50879
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    48643,
+    49340,
+    50734
+   ],
+   "execution_ms": [
+    116.64,
+    119.02,
+    147.71
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p05_none",
+   "planned_pair_readable": 50879,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    48643,
+    49340,
+    50734
+   ],
+   "execution_ms": [
+    12.9,
+    14.46,
+    30.52
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_none",
+   "planned_pair_readable": 50879,
+   "removed_by_filter": [
+    851,
+    852
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    48643,
+    49340,
+    50734
+   ],
+   "execution_ms": [
+    1.7,
+    1.72,
+    1.76
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_none",
+   "planned_pair_readable": 50879,
+   "removed_by_filter": [
+    99
+   ],
+   "rows_returned": [
+    1
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    48643,
+    49340,
+    50734
+   ],
+   "execution_ms": [
+    11.89,
+    12.61,
+    12.98
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_none",
+   "planned_pair_readable": 50879,
+   "removed_by_filter": [
+    851,
+    852
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    49438,
+    49565,
+    50992
+   ],
+   "execution_ms": [
+    1.96,
+    2.07,
+    7.56
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_pos",
+   "planned_pair_readable": 50448,
+   "removed_by_filter": [
+    34
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    50448
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    49438,
+    49565,
+    50992
+   ],
+   "execution_ms": [
+    123.41,
+    149.52,
+    168.58
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p05_pos",
+   "planned_pair_readable": 50448,
+   "removed_by_filter": [],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Sort(Bitmap Heap Scan(Bitmap Index Scan[chunks_principals])))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    49438,
+    49565,
+    50992
+   ],
+   "execution_ms": [
+    1.51,
+    1.66,
+    1.67
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_pos",
+   "planned_pair_readable": 50448,
+   "removed_by_filter": [
+    34
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    49438,
+    49565,
+    50992
+   ],
+   "execution_ms": [
+    1.62,
+    1.71,
+    1.76
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_pos",
+   "planned_pair_readable": 50448,
+   "removed_by_filter": [
+    34
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    49438,
+    49565,
+    50992
+   ],
+   "execution_ms": [
+    0.96,
+    1.3,
+    1.54
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p05_pos",
+   "planned_pair_readable": 50448,
+   "removed_by_filter": [
+    34
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    178262,
+    180263,
+    186801
+   ],
+   "execution_ms": [
+    2.52,
+    2.73,
+    114.58
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_neg",
+   "planned_pair_readable": 200357,
+   "removed_by_filter": [
+    99
+   ],
+   "rows_returned": [
+    1
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    200358
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    74276,
+    75110,
+    77834
+   ],
+   "execution_ms": [
+    2592.55,
+    2642.21,
+    2644.86
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p2_neg",
+   "planned_pair_readable": 200357,
+   "removed_by_filter": [
+    266548
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    178262,
+    180263,
+    186801
+   ],
+   "execution_ms": [
+    13.45,
+    14.47,
+    284.83
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_neg",
+   "planned_pair_readable": 200357,
+   "removed_by_filter": [
+    636
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    1
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    178262,
+    180263,
+    186801
+   ],
+   "execution_ms": [
+    3.35,
+    3.35,
+    4.75
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_neg",
+   "planned_pair_readable": 200357,
+   "removed_by_filter": [
+    99
+   ],
+   "rows_returned": [
+    1
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    178262,
+    180263,
+    186801
+   ],
+   "execution_ms": [
+    19.88,
+    22.57,
+    35.42
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_neg",
+   "planned_pair_readable": 200357,
+   "removed_by_filter": [
+    636
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    4,
+    9
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    181553,
+    184389,
+    184661
+   ],
+   "execution_ms": [
+    2.72,
+    2.96,
+    187.89
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_none",
+   "planned_pair_readable": 201086,
+   "removed_by_filter": [
+    91,
+    96
+   ],
+   "rows_returned": [
+    4,
+    9
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    201087
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    75647,
+    76829,
+    76942
+   ],
+   "execution_ms": [
+    2164.99,
+    2189.05,
+    2228.57
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p2_none",
+   "planned_pair_readable": 201086,
+   "removed_by_filter": [
+    266305
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    181553,
+    184389,
+    184661
+   ],
+   "execution_ms": [
+    5.32,
+    5.48,
+    137.45
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_none",
+   "planned_pair_readable": 201086,
+   "removed_by_filter": [
+    103,
+    105,
+    111
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    4,
+    9
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    181553,
+    184389,
+    184661
+   ],
+   "execution_ms": [
+    3.29,
+    3.5,
+    4.51
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_none",
+   "planned_pair_readable": 201086,
+   "removed_by_filter": [
+    91,
+    96
+   ],
+   "rows_returned": [
+    4,
+    9
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    181553,
+    184389,
+    184661
+   ],
+   "execution_ms": [
+    5.29,
+    6.04,
+    6.95
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_none",
+   "planned_pair_readable": 201086,
+   "removed_by_filter": [
+    103,
+    105,
+    111
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    179958,
+    180286,
+    180885
+   ],
+   "execution_ms": [
+    2.86,
+    3.12,
+    215.8
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_pos",
+   "planned_pair_readable": 200002,
+   "removed_by_filter": [
+    12,
+    14
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    200001
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    74982,
+    75119,
+    75369
+   ],
+   "execution_ms": [
+    1768.41,
+    1810.66,
+    1833.11
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p2_pos",
+   "planned_pair_readable": 200002,
+   "removed_by_filter": [
+    266666
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    179958,
+    180286,
+    180885
+   ],
+   "execution_ms": [
+    1.48,
+    2.4,
+    3.55
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_pos",
+   "planned_pair_readable": 200002,
+   "removed_by_filter": [
+    12,
+    14
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    179958,
+    180286,
+    180885
+   ],
+   "execution_ms": [
+    1.75,
+    2.44,
+    3.55
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_pos",
+   "planned_pair_readable": 200002,
+   "removed_by_filter": [
+    12,
+    14
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    179958,
+    180286,
+    180885
+   ],
+   "execution_ms": [
+    1.46,
+    2.11,
+    3.27
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p2_pos",
+   "planned_pair_readable": 200002,
+   "removed_by_filter": [
+    12,
+    14
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    390398,
+    393139,
+    393300
+   ],
+   "execution_ms": [
+    1.65,
+    1.75,
+    176.31
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_neg",
+   "planned_pair_readable": 500885,
+   "removed_by_filter": [
+    1
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    500886
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    162666,
+    163808,
+    163875
+   ],
+   "execution_ms": [
+    3232.33,
+    3435.69,
+    4516.03
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p5_neg",
+   "planned_pair_readable": 500885,
+   "removed_by_filter": [
+    166372
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    390398,
+    393139,
+    393300
+   ],
+   "execution_ms": [
+    0.87,
+    1.54,
+    2.0
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_neg",
+   "planned_pair_readable": 500885,
+   "removed_by_filter": [
+    1
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    390398,
+    393139,
+    393300
+   ],
+   "execution_ms": [
+    1.35,
+    1.56,
+    1.65
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_neg",
+   "planned_pair_readable": 500885,
+   "removed_by_filter": [
+    1
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    390398,
+    393139,
+    393300
+   ],
+   "execution_ms": [
+    1.22,
+    1.3,
+    1.87
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_neg",
+   "planned_pair_readable": 500885,
+   "removed_by_filter": [
+    1
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    392049,
+    392840,
+    397080
+   ],
+   "execution_ms": [
+    2.73,
+    2.77,
+    193.12
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_none",
+   "planned_pair_readable": 502206,
+   "removed_by_filter": [
+    3
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    502206
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    163354,
+    163683,
+    165450
+   ],
+   "execution_ms": [
+    3001.18,
+    3193.7,
+    4240.77
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p5_none",
+   "planned_pair_readable": 502206,
+   "removed_by_filter": [
+    165931
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    392049,
+    392840,
+    397080
+   ],
+   "execution_ms": [
+    2.04,
+    2.11,
+    3.0
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_none",
+   "planned_pair_readable": 502206,
+   "removed_by_filter": [
+    3
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    392049,
+    392840,
+    397080
+   ],
+   "execution_ms": [
+    1.73,
+    2.09,
+    2.96
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_none",
+   "planned_pair_readable": 502206,
+   "removed_by_filter": [
+    3
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    392049,
+    392840,
+    397080
+   ],
+   "execution_ms": [
+    1.52,
+    1.57,
+    2.84
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_none",
+   "planned_pair_readable": 502206,
+   "removed_by_filter": [
+    3
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@default",
+   "estimated_rows": [
+    393034,
+    396509,
+    396547
+   ],
+   "execution_ms": [
+    2.19,
+    2.21,
+    230.87
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_pos",
+   "planned_pair_readable": 500860,
+   "removed_by_filter": [
+    2
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    500859
+   ],
+   "arm": "a4@exact",
+   "estimated_rows": [
+    163764,
+    165212,
+    165228
+   ],
+   "execution_ms": [
+    2694.66,
+    2832.55,
+    3764.96
+   ],
+   "hnsw_plans": 0,
+   "jobs": 3,
+   "layout": "w3_s0p5_pos",
+   "planned_pair_readable": 500860,
+   "removed_by_filter": [
+    166380
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Gather Merge(Sort(Seq Scan)))": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a4@iterative",
+   "estimated_rows": [
+    393034,
+    396509,
+    396547
+   ],
+   "execution_ms": [
+    1.85,
+    2.03,
+    2.91
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_pos",
+   "planned_pair_readable": 500860,
+   "removed_by_filter": [
+    2
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@default",
+   "estimated_rows": [
+    393034,
+    396509,
+    396547
+   ],
+   "execution_ms": [
+    1.67,
+    1.87,
+    2.53
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_pos",
+   "planned_pair_readable": 500860,
+   "removed_by_filter": [
+    2
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  },
+  {
+   "actual_rows": [
+    10
+   ],
+   "arm": "a5-rls@iterative",
+   "estimated_rows": [
+    393034,
+    396509,
+    396547
+   ],
+   "execution_ms": [
+    1.35,
+    1.47,
+    2.31
+   ],
+   "hnsw_plans": 3,
+   "jobs": 3,
+   "layout": "w3_s0p5_pos",
+   "planned_pair_readable": 500860,
+   "removed_by_filter": [
+    2
+   ],
+   "rows_returned": [
+    10
+   ],
+   "shapes": {
+    "Limit(Index Scan[chunks_hnsw])": 3
+   },
+   "workload": "w3"
+  }
+ ],
+ "registered_analysis": false,
+ "release": "results-v1",
+ "repository": "muzakkirhussain011/rag-permission-bench",
+ "run_id": "44809791659"
+}

@@ -1,0 +1,19 @@
+\begin{table}[t]
+\caption{Engine faults: per arm, how many of its $n$ questions raised an error (err.) and how many came back empty (emp.) with no fault, with connections refused, with 2\,s added to every engine response, and with connections closed after 16\,KiB; five stores, three seeds. No answer under any fault held a chunk outside the readable set.}
+\label{tab:faults}
+\footnotesize\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}lrrrrrrrrr@{}}
+\toprule
+ & & \multicolumn{2}{c}{none} & \multicolumn{2}{c}{refused} & \multicolumn{2}{c}{+2\,s} & \multicolumn{2}{c}{cut} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(l){9-10}
+Arm & $n$ & err. & emp. & err. & emp. & err. & emp. & err. & emp. \\
+\midrule
+A1 post-filter, OpenFGA & 1{,}500 & 0 & 1{,}017 & 1{,}500 & 0 & 0 & 1{,}017 & 0 & 1{,}017 \\
+A1 post-filter, SpiceDB & 1{,}500 & 0 & 1{,}017 & 1{,}500 & 0 & 0 & 1{,}017 & 60 & 982 \\
+A2 over $3k$/$10k$, OpenFGA & 3{,}000 & 0 & 1{,}596 & 3{,}000 & 0 & 0 & 1{,}598 & 0 & 1{,}598 \\
+A2 over $3k$/$10k$, SpiceDB & 3{,}000 & 0 & 1{,}598 & 3{,}000 & 0 & 0 & 1{,}598 & 660 & 1{,}269 \\
+A3 engine pre-filter & 2{,}700 & 0 & 99 & 2{,}700 & 0 & 0 & 99 & 2{,}700 & 0 \\
+A7 wardowl & 600 & 0 & 165 & 600 & 0 & 600 & 0 & 600 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
