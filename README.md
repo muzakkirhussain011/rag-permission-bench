@@ -19,6 +19,8 @@ The measured runs are finished and analysed.
   (2026-11-08), made by the `report` workflow at commit `d3099e9`.
 - Supplementary analyses of `results-v1` (section 4 below), outside the registered analysis, are in
   [`reports/extras-results-v1/`](reports/extras-results-v1/README.md).
+- Exploratory follow-up runs, asked for by an internal review of the paper draft, are registered in
+  [`prereg/addendum-1.md`](prereg/addendum-1.md) (release `prereg-addendum-1`), written before any of them ran.
 
 ## What is compared
 
