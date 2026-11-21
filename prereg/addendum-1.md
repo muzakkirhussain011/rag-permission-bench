@@ -195,3 +195,30 @@ are not hypotheses of this study.
 Any departure from this addendum (a job that cannot run, an arm that fails on a store, a setting a store refuses,
 a change of plan) is dated, explained and listed in the report and in the paper. Cells that cannot run are reported
 as not run, with the reason.
+
+## Record of the runs and their deviations (added 2026-11-21, after the runs)
+
+This section was added after the runs ended; nothing above it has changed since release `prereg-addendum-1`.
+
+- **The runs.** All 66 jobs ran in run 44809360668 of the `followup` workflow at commit `1ed8977`, from 2026-11-20
+  20:13 UTC to 2026-11-21 01:38 UTC, at most twelve at a time, each on its own GitHub-hosted runner. Every job ran
+  once. No job reached the 5-hour budget.
+- **An addition to the analysis (section 6).** On 2026-11-20, while the runs were in progress and after the first
+  jobs had finished, the check against `results-v1` was extended to give each job's own recall in every compared
+  cell, from the raw outputs of both runs, and each job's store load record (pull request #8; report code only).
+  The reason was a result already seen: the first finished Qdrant sweep job (share 0.01, seed 1) recalled 0.983 at
+  the default setting on the farthest-first layout, where `results-v1`'s cell, pooled over its three jobs, is
+  0.917, and a comparison of pooled means cannot show whether one job or all of them differ. Nothing else in the
+  analysis changed.
+- **Grants under the symmetric protocol (section 4.3).** W3 has no chunk that no user of the workload may read
+  (every change job recorded 0 such chunks), so every symmetric grant went to the second pool: a chunk the probed
+  user could not read at any point of the job, emptied of its readers before the pause.
+- **One job recorded as cancelled.** Job 136616467426, `sweep w3 s0p05 opensearch seed 3`, was still measuring after
+  2.9 hours, while the other five OpenSearch sweep jobs had taken 0.79 to 0.87 hours, and its log could not be read
+  while it ran (GitHub's API serves a job's log only once the job ends). At 01:38 UTC the run was cancelled so that
+  the job could be run again with the same seed (section 4.4). The log, readable once the job had ended, shows that
+  the job had already finished: it had answered every query of every arm (78,000 answers, no errors), scored them
+  (its measuring step ended at 01:38:31) and uploaded its complete outputs (01:38:34) by the time the cancellation
+  reached it, and GitHub then recorded the job, with the run, as cancelled. The job was not run again, and its outputs are analysed like every other job's. Its
+  five A4 arms took 1,322 to 1,939 s each; at ef 100 without a lookup, their p50 was 385 to 536 ms per layout,
+  against 7.6 to 10.3 ms in that cell's other two jobs.

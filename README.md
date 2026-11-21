@@ -22,7 +22,11 @@ The measured runs are finished and analysed.
 - Exploratory follow-up runs, asked for by an internal review of the paper draft, are registered in
   [`prereg/addendum-1.md`](prereg/addendum-1.md) (release `prereg-addendum-1`,
   [doi:10.5281/zenodo.24406063](https://doi.org/10.5281/zenodo.24406063)), written before any of them ran
-  (section 5 below).
+  (section 5 below). All 66 ran in run 44809360668 of the `followup` workflow at commit `1ed8977`, from 2026-11-20
+  20:13 UTC to 2026-11-21 01:38 UTC; a job took 0.12 to 2.92 hours (median 0.46), 39.3 runner-hours in all. Every
+  job ran once; one is recorded as cancelled although it had finished and uploaded its outputs (the addendum's
+  record of the runs says why). Their report, made by `bench.followup` in the `followup-report` workflow, is the
+  release `followup-v1`.
 
 ## What is compared
 
@@ -52,6 +56,7 @@ pre-registration, section 4.
 | `data-msmarco-v1` | `vectors.npy` (1,000,000 passage vectors, 384 dimensions), `queries.npy` and `questions.json` (300 dev questions), `passages.json.gz` (BEIR passage ids in order), `corpus-meta.json`, `w3-workload.tar.gz`, four `w2_*-workload.tar.gz`, `SHA256SUMS` | no |
 | `data-enron-v2` | `w1-vectors.npy`, `w1-queries.npy`, `w1-workload.tar.gz`, `SHA256SUMS` | no |
 | `results-v1` | `results-raw.tar.gz` (254,808,407 bytes), `report.tar.gz`, `SHA256SUMS` (both archives) | Zenodo [10.5281/zenodo.24055691](https://doi.org/10.5281/zenodo.24055691) holds the repository's source zip at the tag `results-v1`, not these three files |
+| `followup-v1` | `results-raw.tar.gz` (the 66 follow-up jobs' outputs), `report.tar.gz` (`report/followup.md` presents it), `SHA256SUMS` (both archives) | Zenodo holds the repository's source zip at the tag `followup-v1`, not these three files |
 
 Each workload archive holds the access lists (`acl.npz`, `names.json`), the measured layouts (`layouts.json`),
 `meta.json` (provenance, and the SHA-256 of the vectors, questions, access lists and layouts), the exact answers with
@@ -189,7 +194,9 @@ gh workflow run cell.yml -f workload=w3 -f store=qdrant -f kind=run -f plan=swee
 
 Outside Actions, `python -m bench.run ... --plan sweep` and `python -m bench.churn ... --plan diag-a` run the same
 jobs; `python -m bench.followup --results artifacts --baseline <results-v1 report> --out report` makes the report
-(`report/followup.md` presents it).
+(`report/followup.md` presents it). The report of the 66 jobs is the release `followup-v1`; to rebuild it from that
+release's raw outputs, unpack `results-raw.tar.gz` (it holds `artifacts/`) and run `bench.followup` on it, with
+`results-v1`'s report and, for each job's own recall, its raw outputs as the baseline, as `followup-report.yml` does.
 
 ### Check the harness on synthetic data
 
