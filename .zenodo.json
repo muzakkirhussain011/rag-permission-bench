@@ -1,15 +1,16 @@
 {
-  "title": "Pre-registration addendum 1 (exploratory follow-up runs): Enforcing Document Permissions in Vector Search, an Experimental Comparison",
-  "upload_type": "other",
-  "description": "<p>Addendum 1 to the pre-registration deposited at https://doi.org/10.5281/zenodo.24026269 (release prereg-v1 of this repository). It registers exploratory follow-up runs before any of them ran: each store's filter and the post-filters at three settings of search breadth (ef 40, 100 and 400) and pgvector with a raised iterative-scan limit; the cost of looking up a user's principals in SpiceDB or OpenFGA for the arms that filter in the store; p50 and p99 latency per job; and a diagnostic of the permission-change protocol with the same pause before grants and revocations and SpiceDB's at_least_as_fresh and fully_consistent reads. The addendum is <code>prereg/addendum-1.md</code>; this version archives the repository at the release it was made from. The measured results it follows are release results-v1 (https://doi.org/10.5281/zenodo.24055691). It changes nothing in the original registration. Code and history: https://github.com/muzakkirhussain011/rag-permission-bench. The study includes wardowl, the author's own library, as one arm; this is a declared conflict of interest.</p>",
+  "title": "Follow-up results (exploratory): Enforcing Document Permissions in Vector Search, an Experimental Comparison",
+  "upload_type": "dataset",
+  "description": "<p>The exploratory follow-up runs registered, before any of them ran, in addendum 1 to the pre-registration (https://doi.org/10.5281/zenodo.24406063; the pre-registration itself is https://doi.org/10.5281/zenodo.24026269). They measure each store's filter and the post-filters at three settings of search breadth (ef 40, 100 and 400) and pgvector with raised iterative-scan limits; the cost of looking up a user's principals in SpiceDB or OpenFGA for the arms that filter in the store; p50 and p99 latency per job; and a diagnostic of the permission-change protocol with SpiceDB's at_least_as_fresh and fully_consistent reads. They extend the measured results of release results-v1 (https://doi.org/10.5281/zenodo.24055691), whose cells at ef 100 they also re-measure. This version archives the repository (the harness and bench.followup, which made the report) at the GitHub release it was made from. The raw outputs of every follow-up job and the report are assets of that GitHub release (results-raw.tar.gz and report.tar.gz, with <code>SHA256SUMS</code> covering both), not files of this record; <code>report/collected.tsv</code> lists every job with its workflow run, and <code>report/followup.md</code> presents the report. The raw outputs hold identifiers, scores, timings and plan shapes, not passage or message text; the workloads they refer to are the releases data-msmarco-v1 (derived from MS MARCO, non-commercial research only under its terms) and data-enron-v2 (derived from the CMU Enron corpus) of the repository. Code and history: https://github.com/muzakkirhussain011/rag-permission-bench. The study includes wardowl, the author's own library, as one arm; this is a declared conflict of interest.</p>",
   "creators": [
     {"name": "Hussain, Syed Muzakkir", "affiliation": "Independent Researcher"}
   ],
   "license": "Apache-2.0",
-  "keywords": ["pre-registration", "addendum", "retrieval-augmented generation", "access control", "vector search", "benchmark", "authorization"],
+  "keywords": ["retrieval-augmented generation", "access control", "vector search", "benchmark", "authorization", "exploratory results"],
   "related_identifiers": [
-    {"identifier": "10.5281/zenodo.24026269", "relation": "isSupplementTo", "resource_type": "other"},
-    {"identifier": "10.5281/zenodo.24055691", "relation": "references", "resource_type": "dataset"}
+    {"identifier": "10.5281/zenodo.24406063", "relation": "references", "resource_type": "other"},
+    {"identifier": "10.5281/zenodo.24055691", "relation": "isSupplementTo", "resource_type": "dataset"},
+    {"identifier": "10.5281/zenodo.24026269", "relation": "references", "resource_type": "other"}
   ],
   "access_right": "open"
 }
