@@ -25,8 +25,10 @@ The measured runs are finished and analysed.
   (section 5 below). All 66 ran in run 44809360668 of the `followup` workflow at commit `1ed8977`, from 2026-11-20
   20:13 UTC to 2026-11-21 01:38 UTC; a job took 0.12 to 2.92 hours (median 0.46), 39.3 runner-hours in all. Every
   job ran once; one is recorded as cancelled although it had finished and uploaded its outputs (the addendum's
-  record of the runs says why). Their report, made by `bench.followup` in the `followup-report` workflow, is the
-  release `followup-v1`.
+  record of the runs says why). Their report, made by `bench.followup` in the `followup-report` workflow (run
+  44852699273, commit `b120e47`), is the release `followup-v1`
+  ([doi:10.5281/zenodo.24409839](https://doi.org/10.5281/zenodo.24409839) for the source at that release); its
+  Markdown summary is also in [`reports/followup-v1/followup.md`](reports/followup-v1/followup.md).
 
 ## What is compared
 
@@ -56,7 +58,7 @@ pre-registration, section 4.
 | `data-msmarco-v1` | `vectors.npy` (1,000,000 passage vectors, 384 dimensions), `queries.npy` and `questions.json` (300 dev questions), `passages.json.gz` (BEIR passage ids in order), `corpus-meta.json`, `w3-workload.tar.gz`, four `w2_*-workload.tar.gz`, `SHA256SUMS` | no |
 | `data-enron-v2` | `w1-vectors.npy`, `w1-queries.npy`, `w1-workload.tar.gz`, `SHA256SUMS` | no |
 | `results-v1` | `results-raw.tar.gz` (254,808,407 bytes), `report.tar.gz`, `SHA256SUMS` (both archives) | Zenodo [10.5281/zenodo.24055691](https://doi.org/10.5281/zenodo.24055691) holds the repository's source zip at the tag `results-v1`, not these three files |
-| `followup-v1` | `results-raw.tar.gz` (the 66 follow-up jobs' outputs), `report.tar.gz` (`report/followup.md` presents it), `SHA256SUMS` (both archives) | Zenodo holds the repository's source zip at the tag `followup-v1`, not these three files |
+| `followup-v1` | `results-raw.tar.gz` (266,504,551 bytes: the 66 follow-up jobs' outputs), `report.tar.gz` (`report/followup.md` presents it), `SHA256SUMS` (both archives) | Zenodo [10.5281/zenodo.24409839](https://doi.org/10.5281/zenodo.24409839) holds the repository's source zip at the tag `followup-v1`, not these three files |
 
 Each workload archive holds the access lists (`acl.npz`, `names.json`), the measured layouts (`layouts.json`),
 `meta.json` (provenance, and the SHA-256 of the vectors, questions, access lists and layouts), the exact answers with
